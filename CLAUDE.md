@@ -7,12 +7,12 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Design and phase plan: `docs/PLAN.md`
 - Why things are the way they are: `docs/DECISIONS.md`
 
-**Current phase: 1 (scaffold) complete, awaiting go-ahead for Phase 2.** Update this line at the end of every phase.
+**Current phase: 1 (scaffold) complete. The plan was revised on 2026-10-02 for the $0 constraint; awaiting approval of the revision and the four configs before Phase 2.** Update this line at the end of every phase.
 
 ## How we work
 
 - Work in phases as listed in `docs/PLAN.md` Section 9. Do not start a phase without the owner's "go".
-- For every phase: list the files to create or change, implement, write tests, run them, commit with a clear message, then report what was done, the exact commands to verify it, decisions made, and open questions. Then stop.
+- For every phase: list the files to create or change, implement, write tests, run them, commit with a clear message, push to `origin` (public GitHub repo `CaringNihilistic/agent-eval-arena`), then report what was done, the exact commands to verify it, decisions made, and open questions. Then stop.
 - Add a line to `docs/DECISIONS.md` for every significant decision.
 - If the brief or the plan has a flaw, say so plainly and propose a fix. Do not silently work around it.
 - Ask before adding any dependency that is not in the stack below or already approved in `docs/DECISIONS.md`.
@@ -33,8 +33,9 @@ docs/            PLAN.md, DECISIONS.md
 
 - **Frontend:** Next.js 16 (App Router), TypeScript strict, Tailwind CSS, shadcn/ui, React Flow, Recharts, TanStack Query. Tests: Vitest, React Testing Library, one Playwright end-to-end test.
 - **Backend:** Python 3.11+, FastAPI, Pydantic v2, LangGraph, LiteLLM, SQLAlchemy 2.0, Alembic. Tests: pytest.
-- **Database:** SQLite in development, Postgres in production, same models.
-- **Streaming:** Server-Sent Events, one stream per match, events tagged by side.
+- **Database:** SQLite for the local run store (Python). Postgres for votes and rate-limit counters (Docker locally, Neon Free in public).
+- **Hosting:** Vercel Hobby (web) and Neon Free (Postgres). The Python backend is never hosted; live mode is local-only.
+- **Streaming:** Server-Sent Events for local live matches. Public replays are one JSON response, paced in the browser.
 - **Tooling:** uv (inside containers), pnpm (host), ruff, mypy, eslint, prettier, docker-compose.
 
 ## Environment
@@ -93,14 +94,20 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena run` (Phase 2), `a
 
 ### Cost and safety
 
+- **The project costs $0.** No paid API usage and no paid hosting, ever, unless the owner explicitly says otherwise.
+- The runner refuses any model not marked `free_tier` in the pricing table. The only bypass is an explicit override (`--allow-paid` or `ARENA_ALLOW_PAID_MODELS=1`); never set it on your own initiative.
+- Model names, free-tier limits, and prices come from official provider pages, never from memory. Record the source URL and the date checked in the pricing table and in `docs/DECISIONS.md`.
+- Record both `cost_usd` (actually charged) and `reference_cost_usd` (at paid list price). Never present the reference figure as money spent.
+- Rate-limit waits are excluded from latency, timeouts, and replay pacing. A run interrupted by rate limiting is re-run, never recorded as an agent failure.
 - Model calls go through LiteLLM only. No provider SDKs.
 - Never hardcode API keys. Use `.env`; keep `.env.example` committed and current.
-- Visitor-supplied keys are held in memory for the duration of a run and are never written to the database or logs.
 - No test may call a real model. Use the scripted fake client.
 - Recordings written to `data/recordings/` are scrubbed of API keys, auth headers, and `.env` values, and a test fails if a key-like pattern appears there.
-- Recording has a $20 total cap. Run the 10-run pilot, report cost per run and the projected total, and wait for approval before recording the rest.
+- Before recording all 120 runs, run the 10-run pilot, report tokens per run, pass rates, and the projected duration, and wait for approval.
+- Task content is synthetic only: free-tier inputs may be reviewed or used for training by the provider.
 - Agent tools have no live web access. `python_exec` runs only in the sandbox container. Never mount the Docker socket.
 - Rate limit counters live in the database, not in memory.
+- The repo is public. Scan history for secrets before pushing anything that touches credentials or recordings.
 
 ### Code
 
