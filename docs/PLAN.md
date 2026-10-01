@@ -1,8 +1,10 @@
 # Agent Eval Arena: Plan
 
-Status: revised 2026-10-02 for the zero-cost constraint. Phase 1 complete. The revision is awaiting approval; Phase 2 has not started.
+Status: revised 2026-10-02 for the zero-cost constraint and approved the same day. Phase 1 complete, Phase 2 in progress.
 
-This plan turns the project brief into a buildable design. Where it departs from the brief, the departure is listed in [Section 12](#12-deviations-from-the-brief) and the reason is in `DECISIONS.md`. Items that need the owner's decision are in [Section 13](#13-open-questions).
+A second agent backend for Claude models on the owner's subscription is designed in `CLAUDE_BACKEND.md` and built as Phase 2b. Where this plan says four configs, 120 runs, or 180 matches, the totals with that backend are eight configs, 240 runs, and 360 matches (matches are built only within a backend, with one Elo board per backend).
+
+This plan turns the project brief into a buildable design. Where it departs from the brief, the departure is listed in [Section 12](#12-deviations-from-the-brief) and the reason is in `DECISIONS.md`. Questions raised along the way and their answers are in [Section 13](#13-resolved-questions).
 
 ## 1. What we're building
 
@@ -367,7 +369,7 @@ Sources:
 
 Because free-tier inputs may be reviewed or used for training, tasks contain only synthetic data: no personal or confidential content.
 
-### 7.4 Proposed configs (awaiting approval)
+### 7.4 Free-tier configs (approved)
 
 | Config               | Model                      | Prompt                           | Tools                     |
 | -------------------- | -------------------------- | -------------------------------- | ------------------------- |
@@ -448,19 +450,19 @@ Railway and Fly.io are dropped.
 
 Every phase ends with: files changed, tests run, a commit, a push to GitHub, a report (what was done, exact verification commands, decisions, open questions), then a stop.
 
-| Phase                       | Deliverable                                                                                                                                          | Acceptance                                                                                                                                                                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Planning                  | Plan, `CLAUDE.md`, `DECISIONS.md`                                                                                                                    | Done                                                                                                                                                                                                                        |
-| 1 Scaffold                  | Monorepo, web + api + sandbox, compose, lint/typecheck, health endpoint, schema generation                                                           | Done                                                                                                                                                                                                                        |
-| 2 Runner + tracing          | LangGraph loop, four tools, sandbox execution, event emitter, pricing table with free flags and reference prices, free-only guard, `arena run` CLI   | Unit tests per tool, including sandbox escape attempts and timeouts; every emitted event validates against the schema; a test per limit proving the right `stop_reason`; a test that a non-free or unknown model is refused |
-| 3 Tasks + scorers           | 30 YAML tasks, fixtures, corpus, all scorers, `arena eval` CLI                                                                                       | Per task, a test that a known-correct answer passes and a known-wrong one fails                                                                                                                                             |
-| 4 Stores + API + streaming  | Python run store and run API with SSE; `arena export`; Postgres schema; web route handlers for matches, blind view, and votes                        | Python integration test: start two runs, consume the streams, gap-free `seq`, stored score, resume from a cursor. Web test: no redacted field and no `score_computed` event reaches a voter who has not voted               |
-| 5 Arena UI                  | `/arena` pickers, split-pane traces, counter strip (steps and elapsed time before the vote), list view, plain vote buttons, scorecard after the vote | A full live match runs in the browser locally; component tests for the trace card and scorecard                                                                                                                             |
-| 6 Voting + reveal           | Reveal animation, vote validation, double-vote handling, DB-backed rate limits                                                                       | Tests for vote validation, double-vote rejection, and rate-limit persistence across a restart                                                                                                                               |
-| 7 Leaderboards              | Elo, bootstrap intervals, objective table, agreement, category filters                                                                               | Elo matches hand-computed examples; bootstrap is deterministic under a fixed seed; page renders with seeded data                                                                                                            |
-| 8 Replay + recording safety | Client-paced replay, recorder with throttle, backoff, and resume, pilot gate, scrubbed export                                                        | With the Python API unreachable, a visitor completes a replay match and votes, and a test asserts no request is made to it; limiter and resume tests; a test that fails on a key-like pattern in `data/recordings/`         |
-| 9 Polish                    | Theme, graph view, permalinks, `/about`, empty/loading/error states, mobile layout, Open Graph images                                                | Lighthouse ≥ 90 for performance and accessibility; Playwright end-to-end test passes                                                                                                                                        |
-| 10 Results + launch         | Pilot, then full recording after approval; README with measured results; deploy to Vercel Hobby and Neon Free                                        | The deployed site works end to end in replay mode, with $0 spent                                                                                                                                                            |
+| Phase                                | Deliverable                                                                                                                                          | Acceptance                                                                                                                                                                                                                  |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Planning                           | Plan, `CLAUDE.md`, `DECISIONS.md`                                                                                                                    | Done                                                                                                                                                                                                                        |
+| 1 Scaffold                           | Monorepo, web + api + sandbox, compose, lint/typecheck, health endpoint, schema generation                                                           | Done                                                                                                                                                                                                                        |
+| 2 Runner + tracing (LiteLLM backend) | LangGraph loop, four tools, sandbox execution, event emitter, pricing table with free flags and reference prices, free-only guard, `arena run` CLI   | Unit tests per tool, including sandbox escape attempts and timeouts; every emitted event validates against the schema; a test per limit proving the right `stop_reason`; a test that a non-free or unknown model is refused |
+| 3 Tasks + scorers                    | 30 YAML tasks, fixtures, corpus, all scorers, `arena eval` CLI                                                                                       | Per task, a test that a known-correct answer passes and a known-wrong one fails                                                                                                                                             |
+| 4 Stores + API + streaming           | Python run store and run API with SSE; `arena export`; Postgres schema; web route handlers for matches, blind view, and votes                        | Python integration test: start two runs, consume the streams, gap-free `seq`, stored score, resume from a cursor. Web test: no redacted field and no `score_computed` event reaches a voter who has not voted               |
+| 5 Arena UI                           | `/arena` pickers, split-pane traces, counter strip (steps and elapsed time before the vote), list view, plain vote buttons, scorecard after the vote | A full live match runs in the browser locally; component tests for the trace card and scorecard                                                                                                                             |
+| 6 Voting + reveal                    | Reveal animation, vote validation, double-vote handling, DB-backed rate limits                                                                       | Tests for vote validation, double-vote rejection, and rate-limit persistence across a restart                                                                                                                               |
+| 7 Leaderboards                       | Elo, bootstrap intervals, objective table, agreement, category filters                                                                               | Elo matches hand-computed examples; bootstrap is deterministic under a fixed seed; page renders with seeded data                                                                                                            |
+| 8 Replay + recording safety          | Client-paced replay, recorder with throttle, backoff, and resume, pilot gate, scrubbed export                                                        | With the Python API unreachable, a visitor completes a replay match and votes, and a test asserts no request is made to it; limiter and resume tests; a test that fails on a key-like pattern in `data/recordings/`         |
+| 9 Polish                             | Theme, graph view, permalinks, `/about`, empty/loading/error states, mobile layout, Open Graph images                                                | Lighthouse ≥ 90 for performance and accessibility; Playwright end-to-end test passes                                                                                                                                        |
+| 10 Results + launch                  | Pilot, then full recording after approval; README with measured results; deploy to Vercel Hobby and Neon Free                                        | The deployed site works end to end in replay mode, with $0 spent                                                                                                                                                            |
 
 ## 11. Risks
 
@@ -508,7 +510,7 @@ Approved by the owner:
 17. The project costs $0: free model tiers only, a free-only guard in the runner, and free hosting (Vercel Hobby and Neon). Railway and Fly.io are dropped; the Python backend is not hosted; live mode is local-only.
 18. Cost is reported twice: actual ($0) and at paid list rates.
 
-Consequences of item 17, proposed in this revision and awaiting approval:
+Consequences of item 17, also approved:
 
 19. Voting, blind-view redaction, and leaderboards are implemented in TypeScript route handlers, not in FastAPI, because the public site has no Python.
 20. The public site paces replays in the browser from one JSON response; SSE is used only for local live matches.
@@ -516,10 +518,8 @@ Consequences of item 17, proposed in this revision and awaiting approval:
 22. The admin token and bring-your-own-key flow are dropped.
 23. Run latency is active time, excluding rate-limit waits.
 
-## 13. Open questions
+## 13. Resolved questions
 
-1. **Approve the four configs** in Section 7.4.
-2. **Approve dropping the admin token and bring-your-own-key.** With live mode local-only there is no public endpoint for them to protect. `/configs` management becomes a local-only page.
-3. **Approve one new web dependency: `postgres`** (the `porsager/postgres` driver), so the route handlers can reach Postgres. It works against both the local Docker database and Neon's pooled connection string. Migrations would be plain SQL files applied by a small script.
-4. **Approve the architecture consequences** in Section 12, items 19 to 23.
-5. **Keys and limits needed before the pilot (not before Phase 2):** a Gemini API key from a Google Cloud project without billing, a Groq key on the free plan, and the Gemini free-tier limits for `gemini-3.8-flash` as shown on your AI Studio rate-limit page.
+All approved by the owner on 2026-10-02: the four free-tier configs; dropping the admin token and bring-your-own-key; the `postgres` driver for the web app; and the architecture consequences in Section 12, items 19 to 23, on condition that every piece of logic has exactly one implementation (Elo, confidence intervals, the agreement stat, and blind-view redaction live only in TypeScript).
+
+Still needed from the owner before any recording: a Gemini API key from a Google Cloud project without billing, a Groq key on the free plan, and the Gemini free-tier limits for `gemini-3.8-flash` from the AI Studio rate-limit page.

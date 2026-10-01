@@ -7,13 +7,14 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Design and phase plan: `docs/PLAN.md`
 - Why things are the way they are: `docs/DECISIONS.md`
 
-**Current phase: 1 (scaffold) complete. The plan was revised on 2026-10-02 for the $0 constraint; awaiting approval of the revision and the four configs before Phase 2.** Update this line at the end of every phase.
+**Current phase: 2 (runner and tracing, LiteLLM backend) in progress. Next: 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`), then 3.** Update this line at the end of every phase.
 
 ## How we work
 
-- Work in phases as listed in `docs/PLAN.md` Section 9. Do not start a phase without the owner's "go".
+- Work in phases as listed in `docs/PLAN.md` Section 10. Do not start a phase without the owner's "go".
 - For every phase: list the files to create or change, implement, write tests, run them, commit with a clear message, push to `origin` (public GitHub repo `CaringNihilistic/agent-eval-arena`), then report what was done, the exact commands to verify it, decisions made, and open questions. Then stop.
 - Add a line to `docs/DECISIONS.md` for every significant decision.
+- Every piece of logic has exactly one implementation. Elo, confidence intervals, the agreement stat, and blind-view redaction live only in TypeScript (`apps/web`); Python must not compute them.
 - If the brief or the plan has a flaw, say so plainly and propose a fix. Do not silently work around it.
 - Ask before adding any dependency that is not in the stack below or already approved in `docs/DECISIONS.md`.
 
