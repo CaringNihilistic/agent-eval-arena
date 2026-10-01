@@ -19,6 +19,10 @@ export type TraceEvent =
  */
 export type Side = ("left" | "right") | null;
 /**
+ * Which agent loop ran the config: our LangGraph loop over LiteLLM, or Claude Code's loop through the Claude Agent SDK.
+ */
+export type AgentBackend = "litellm" | "agent_sdk";
+/**
  * Tools a config can enable.
  */
 export type ToolName = "calculator" | "python_exec" | "search_docs" | "read_file";
@@ -50,6 +54,7 @@ export interface ConfigSnapshot {
   family_id: string;
   version: number;
   display_name: string;
+  backend: AgentBackend;
   model: string;
   provider: string;
   model_family: string;
@@ -98,7 +103,7 @@ export interface LlmCallPayload {
   input_preview: MessagePreview[];
   output: LlmOutput;
   /**
-   * Null in the blind view.
+   * All input tokens, including any read from or written to the provider's prompt cache. Null in the blind view.
    */
   prompt_tokens: number | null;
   /**
@@ -106,9 +111,21 @@ export interface LlmCallPayload {
    */
   completion_tokens: number | null;
   /**
-   * Null in the blind view.
+   * Input tokens served from the provider's prompt cache, when the provider reports it. Null when not reported, and in the blind view.
+   */
+  cache_read_tokens: number | null;
+  /**
+   * Input tokens written to the provider's prompt cache, when the provider reports it. Null when not reported, and in the blind view.
+   */
+  cache_write_tokens: number | null;
+  /**
+   * What was actually charged. Zero on free tiers and subscriptions. Null in the blind view.
    */
   cost_usd: number | null;
+  /**
+   * What the same tokens would cost at the provider's paid list price. Null in the blind view.
+   */
+  reference_cost_usd: number | null;
   latency_ms: number;
 }
 /**
@@ -188,9 +205,13 @@ export interface StepFinishedPayload {
    */
   total_tokens: number | null;
   /**
-   * Cumulative for the run. Null in the blind view.
+   * Actually charged, cumulative for the run. Null in the blind view.
    */
   cost_usd: number | null;
+  /**
+   * At paid list price, cumulative for the run. Null in the blind view.
+   */
+  reference_cost_usd: number | null;
 }
 export interface RunFinishedEvent {
   run_id: string;
@@ -204,14 +225,21 @@ export interface RunFinishedEvent {
 export interface RunFinishedPayload {
   final_answer: string | null;
   /**
-   * Null in the blind view.
+   * Actually charged. Null in the blind view.
    */
   cost_usd: number | null;
+  /**
+   * At paid list price. Null in the blind view.
+   */
+  reference_cost_usd: number | null;
   /**
    * Null in the blind view.
    */
   total_tokens: number | null;
   steps: number;
+  /**
+   * Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded.
+   */
   latency_ms: number;
   /**
    * Null in the blind view when the run stopped at a token or cost limit.

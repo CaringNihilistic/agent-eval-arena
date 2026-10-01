@@ -1,0 +1,11 @@
+id: dev-docs-01
+title: Who runs the ferry operator
+category: multi_hop
+difficulty: easy
+prompt: |
+  Who is the current director of the organisation that operates the Harbor Ferry?
+  Answer with the person's full name only.
+required_tools: [search_docs]
+scorer_type: exact
+scorer_config:
+  expected: Imani Okafor

@@ -1,0 +1,13 @@
+id: dev-math-01
+title: Bulk order with a discount
+category: math
+difficulty: easy
+prompt: |
+  A workshop orders 37 boxes of screws at $4.85 per box and 12 drill bits at $13.40 each.
+  Orders over $300 get 8% off the whole order. What is the final total in dollars?
+  Give the number rounded to two decimal places.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 313.03
+  tolerance: 0.01

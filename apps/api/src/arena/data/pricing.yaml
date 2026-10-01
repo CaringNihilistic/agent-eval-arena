@@ -1,0 +1,52 @@
+# Models the runner may call. A model with no entry here is refused.
+#
+# billing:
+#   free          a free API tier; actual cost is $0
+#   subscription  covered by a subscription login; actual cost is $0
+#   paid          billed per token; refused unless explicitly overridden
+#
+# "reference" is the provider's paid list price in USD per million tokens. It is
+# used only for the "at paid rates" figures; nothing is charged at these rates.
+#
+# Every number here was read from the provider's official page on the date in
+# "checked". Do not edit from memory: re-read the page and update the date.
+
+models:
+  gemini/gemini-3.8-flash:
+    provider: gemini
+    billing: free
+    backends: [litellm]
+    reference:
+      input_per_mtok: 0.75
+      output_per_mtok: 3.75
+      source: https://ai.google.dev/gemini-api/docs/pricing
+      checked: 2026-10-02
+      note: Promotional price through 2026-12-31; 1.50 / 7.50 from 2027-01-01.
+    free_tier:
+      source: https://ai.google.dev/gemini-api/docs/rate-limits
+      checked: 2026-10-02
+      note: >-
+        Free-tier limits are not published. The docs say they "can be viewed in
+        Google AI Studio" and apply per project. Copy them from the AI Studio
+        rate-limit page before recording; they are left empty until then.
+      requests_per_minute: null
+      requests_per_day: null
+      tokens_per_minute: null
+      tokens_per_day: null
+
+  groq/openai/gpt-oss-120b:
+    provider: groq
+    billing: free
+    backends: [litellm]
+    reference:
+      input_per_mtok: 0.15
+      output_per_mtok: 0.60
+      source: https://console.groq.com/docs/models
+      checked: 2026-10-02
+    free_tier:
+      source: https://console.groq.com/docs/rate-limits
+      checked: 2026-10-02
+      requests_per_minute: 30
+      requests_per_day: 1000
+      tokens_per_minute: 8000
+      tokens_per_day: 200000

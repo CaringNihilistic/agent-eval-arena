@@ -45,6 +45,9 @@ services:
       dockerfile: apps/sandbox/Dockerfile
     networks:
       - sandbox_net
+    # A minimal init as PID 1 reaps the orphans that executed code leaves behind,
+    # so dead processes cannot pile up against the process limit.
+    init: true
     read_only: true
     tmpfs:
       - /tmp:size=64m
@@ -58,6 +61,8 @@ services:
     cpus: 1.0
     volumes:
       - ./apps/sandbox:/repo/apps/sandbox:ro
+      # Task fixtures the executed code may read. Read-only.
+      - ./tasks/fixtures:/fixtures:ro
     healthcheck:
       test:
         [

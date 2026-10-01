@@ -15,6 +15,13 @@ class ConfigSnapshot(BaseModel):
     family_id: str
     version: Annotated[int, Field(ge=1)]
     display_name: str
+    backend: Annotated[
+        Literal["litellm", "agent_sdk"],
+        Field(
+            description="Which agent loop ran the config: our LangGraph loop over LiteLLM, or Claude Code's loop through the Claude Agent SDK.",
+            title="AgentBackend",
+        ),
+    ]
     model: str
     provider: str
     model_family: str
@@ -91,9 +98,42 @@ class LlmCallPayload(BaseModel):
         Field(description="Messages added to the conversation since the previous model call."),
     ]
     output: LlmOutput
-    prompt_tokens: Annotated[int | None, Field(description="Null in the blind view.", ge=0)]
+    prompt_tokens: Annotated[
+        int | None,
+        Field(
+            description="All input tokens, including any read from or written to the provider's prompt cache. Null in the blind view.",
+            ge=0,
+        ),
+    ]
     completion_tokens: Annotated[int | None, Field(description="Null in the blind view.", ge=0)]
-    cost_usd: Annotated[float | None, Field(description="Null in the blind view.", ge=0.0)]
+    cache_read_tokens: Annotated[
+        int | None,
+        Field(
+            description="Input tokens served from the provider's prompt cache, when the provider reports it. Null when not reported, and in the blind view.",
+            ge=0,
+        ),
+    ]
+    cache_write_tokens: Annotated[
+        int | None,
+        Field(
+            description="Input tokens written to the provider's prompt cache, when the provider reports it. Null when not reported, and in the blind view.",
+            ge=0,
+        ),
+    ]
+    cost_usd: Annotated[
+        float | None,
+        Field(
+            description="What was actually charged. Zero on free tiers and subscriptions. Null in the blind view.",
+            ge=0.0,
+        ),
+    ]
+    reference_cost_usd: Annotated[
+        float | None,
+        Field(
+            description="What the same tokens would cost at the provider's paid list price. Null in the blind view.",
+            ge=0.0,
+        ),
+    ]
     latency_ms: Annotated[int, Field(ge=0)]
 
 
@@ -130,7 +170,17 @@ class StepFinishedPayload(BaseModel):
         int | None, Field(description="Cumulative for the run. Null in the blind view.", ge=0)
     ]
     cost_usd: Annotated[
-        float | None, Field(description="Cumulative for the run. Null in the blind view.", ge=0.0)
+        float | None,
+        Field(
+            description="Actually charged, cumulative for the run. Null in the blind view.", ge=0.0
+        ),
+    ]
+    reference_cost_usd: Annotated[
+        float | None,
+        Field(
+            description="At paid list price, cumulative for the run. Null in the blind view.",
+            ge=0.0,
+        ),
     ]
 
 
@@ -139,10 +189,21 @@ class RunFinishedPayload(BaseModel):
         extra="forbid",
     )
     final_answer: str | None
-    cost_usd: Annotated[float | None, Field(description="Null in the blind view.", ge=0.0)]
+    cost_usd: Annotated[
+        float | None, Field(description="Actually charged. Null in the blind view.", ge=0.0)
+    ]
+    reference_cost_usd: Annotated[
+        float | None, Field(description="At paid list price. Null in the blind view.", ge=0.0)
+    ]
     total_tokens: Annotated[int | None, Field(description="Null in the blind view.", ge=0)]
     steps: Annotated[int, Field(ge=0)]
-    latency_ms: Annotated[int, Field(ge=0)]
+    latency_ms: Annotated[
+        int,
+        Field(
+            description="Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded.",
+            ge=0,
+        ),
+    ]
     stop_reason: Annotated[
         Literal["answered", "max_steps", "max_tokens", "max_cost", "timeout", "error"] | None,
         Field(description="Null in the blind view when the run stopped at a token or cost limit."),

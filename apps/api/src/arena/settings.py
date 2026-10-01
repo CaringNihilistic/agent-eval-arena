@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     sandbox_health_timeout_s: float = 2.0
     schema_path: Path = REPO_ROOT / "packages" / "schema" / "trace-event.schema.json"
 
+    configs_dir: Path = REPO_ROOT / "configs"
+    tasks_dir: Path = REPO_ROOT / "tasks"
+    fixtures_dir: Path = REPO_ROOT / "tasks" / "fixtures"
+    corpus_dir: Path = REPO_ROOT / "tasks" / "corpus"
+
+    # Off by default. The project must cost $0, so a model billed per token is
+    # refused unless this is set on purpose.
+    allow_paid_models: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

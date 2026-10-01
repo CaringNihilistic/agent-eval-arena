@@ -23,6 +23,7 @@ CONFIG: dict[str, Any] = {
     "family_id": "fam_01",
     "version": 1,
     "display_name": "strong",
+    "backend": "litellm",
     "model": "provider/model",
     "provider": "provider",
     "model_family": "family",
@@ -49,7 +50,10 @@ VALID_PAYLOADS: dict[str, dict[str, Any]] = {
         },
         "prompt_tokens": 120,
         "completion_tokens": 18,
-        "cost_usd": 0.00084,
+        "cache_read_tokens": None,
+        "cache_write_tokens": None,
+        "cost_usd": 0.0,
+        "reference_cost_usd": 0.00084,
         "latency_ms": 900,
     },
     "tool_call": {
@@ -68,10 +72,16 @@ VALID_PAYLOADS: dict[str, dict[str, Any]] = {
         "latency_ms": 3,
         "error": None,
     },
-    "step_finished": {"step": 1, "total_tokens": 138, "cost_usd": 0.00084},
+    "step_finished": {
+        "step": 1,
+        "total_tokens": 138,
+        "cost_usd": 0.0,
+        "reference_cost_usd": 0.00084,
+    },
     "run_finished": {
         "final_answer": "4",
-        "cost_usd": 0.0017,
+        "cost_usd": 0.0,
+        "reference_cost_usd": 0.0017,
         "total_tokens": 290,
         "steps": 2,
         "latency_ms": 2100,
@@ -89,9 +99,22 @@ VALID_PAYLOADS: dict[str, dict[str, Any]] = {
 # The blind view nulls these fields; the result must still be a valid event.
 BLIND_OVERRIDES: dict[str, dict[str, Any]] = {
     "run_started": {"config": None},
-    "llm_call": {"model": None, "prompt_tokens": None, "completion_tokens": None, "cost_usd": None},
-    "step_finished": {"total_tokens": None, "cost_usd": None},
-    "run_finished": {"cost_usd": None, "total_tokens": None, "stop_reason": None},
+    "llm_call": {
+        "model": None,
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "cache_read_tokens": None,
+        "cache_write_tokens": None,
+        "cost_usd": None,
+        "reference_cost_usd": None,
+    },
+    "step_finished": {"total_tokens": None, "cost_usd": None, "reference_cost_usd": None},
+    "run_finished": {
+        "cost_usd": None,
+        "reference_cost_usd": None,
+        "total_tokens": None,
+        "stop_reason": None,
+    },
 }
 
 ADAPTER: TypeAdapter[TraceEvent] = TypeAdapter(TraceEvent)
@@ -166,6 +189,12 @@ INVALID_EVENTS: dict[str, dict[str, Any]] = {
         "run_started", config={**CONFIG, "enabled_tools": ["web_search"]}
     ),
     "step zero": event("step_started", step=0),
+    "unknown backend": event("run_started", config={**CONFIG, "backend": "langchain"}),
+    "missing reference cost": {
+        **ENVELOPE,
+        "type": "step_finished",
+        "payload": {"step": 1, "total_tokens": 1, "cost_usd": 0.0},
+    },
 }
 
 

@@ -1,0 +1,12 @@
+id: dev-csv-01
+title: Highest-revenue region
+category: data_analysis
+difficulty: easy
+prompt: |
+  The file dev_sales.csv in the fixtures directory has columns region, month, units, unit_price.
+  Revenue for a row is units times unit_price. Which region has the highest total revenue?
+  Answer with the region name only.
+required_tools: [python_exec]
+scorer_type: exact
+scorer_config:
+  expected: east

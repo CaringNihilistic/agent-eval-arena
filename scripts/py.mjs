@@ -8,9 +8,22 @@ if (!["api", "sandbox"].includes(service) || command.length === 0) {
   process.exit(2);
 }
 
+// The api's tests include integration tests against the real sandbox, so for
+// pytest the api's dependencies are started too. Everything else runs alone.
+const needsSandbox = service === "api" && command[0] === "pytest";
 const result = spawnSync(
   "docker",
-  ["compose", "run", "--rm", "--no-deps", "-T", service, "uv", "run", ...command],
+  [
+    "compose",
+    "run",
+    "--rm",
+    ...(needsSandbox ? [] : ["--no-deps"]),
+    "-T",
+    service,
+    "uv",
+    "run",
+    ...command,
+  ],
   { stdio: "inherit" },
 );
 process.exit(result.status ?? 1);

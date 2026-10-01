@@ -1,0 +1,11 @@
+name: oss-full
+version: 1
+display_name: gpt-oss-120b, full prompt
+backend: litellm
+model: groq/openai/gpt-oss-120b
+provider: groq
+model_family: gpt-oss
+system_prompt_file: prompts/full.md
+enabled_tools: [calculator, python_exec, search_docs, read_file]
+max_steps: 10
+temperature: null

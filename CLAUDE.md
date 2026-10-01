@@ -7,7 +7,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Design and phase plan: `docs/PLAN.md`
 - Why things are the way they are: `docs/DECISIONS.md`
 
-**Current phase: 2 (runner and tracing, LiteLLM backend) in progress. Next: 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`), then 3.** Update this line at the end of every phase.
+**Current phase: 2 (runner and tracing, LiteLLM backend) complete, awaiting go-ahead for 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`), then 3.** Update this line at the end of every phase.
 
 ## How we work
 
@@ -65,9 +65,22 @@ pnpm format                            # prettier + ruff format
 pnpm schema:gen                        # regenerate TS and Pydantic types from the JSON Schema
 pnpm schema:check                      # fail if generated types are stale
 node scripts/py.mjs api <cmd>          # any uv-run command in the api container
+docker compose exec api uv run arena list
+docker compose exec api uv run arena run --config gemini-full --task dev-math-01
 ```
 
-Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena run` (Phase 2), `arena eval` (Phase 3), `arena record --pilot` (Phase 8).
+Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `arena export` (Phase 4), `arena record --pilot` (Phase 8).
+
+## Where things are (backend)
+
+- `apps/api/src/arena/run_context.py`: limits, tool execution, cost, and event emission for one run. Shared by every backend; put anything a second loop would also need here, not in a backend.
+- `apps/api/src/arena/backends/`: agent loops. `litellm_loop.py` is the LangGraph loop; `base.py` is the interface.
+- `apps/api/src/arena/tools/`: the four arena tools and the `submit_answer` control tool.
+- `apps/api/src/arena/data/pricing.yaml`: the pricing table and the free-only guard's source of truth.
+- `apps/api/tests/fakes.py`: the scripted model client. Tests never call a real model.
+- `apps/sandbox/src/sandbox/executor.py`: sandboxed execution. Its tests are escape attempts and must run inside the sandbox container.
+- `apps/web/src/lib/blind-view.ts`: the only redaction code. `apps/web/src/test/leak-scan.ts` is the check every blind response must pass.
+- `configs/`, `tasks/`: agent configs, prompts, tasks, fixtures, corpus.
 
 ## Rules
 

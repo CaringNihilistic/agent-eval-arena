@@ -10,7 +10,7 @@
     "lint": "pnpm lint:web && pnpm format:check && pnpm lint:py && pnpm schema:check",
     "lint:web": "pnpm --filter web lint",
     "lint:py": "node scripts/py.mjs api ruff check . && node scripts/py.mjs api ruff format --check . && node scripts/py.mjs sandbox ruff check . && node scripts/py.mjs sandbox ruff format --check .",
-    "format": "prettier --write . && node scripts/py.mjs api ruff format . && node scripts/py.mjs sandbox ruff format .",
+    "format": "prettier --write . && node scripts/py.mjs api ruff format . ../sandbox",
     "format:check": "prettier --check .",
     "typecheck": "pnpm --filter web typecheck && node scripts/py.mjs api mypy && node scripts/py.mjs sandbox mypy",
     "test": "pnpm test:web && pnpm test:api",
