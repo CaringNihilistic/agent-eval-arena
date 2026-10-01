@@ -20,3 +20,4 @@ test-results/
 coverage/
 .DS_Store
 .pnpm-store/
+.credentials.json
