@@ -7,7 +7,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Design and phase plan: `docs/PLAN.md`
 - Why things are the way they are: `docs/DECISIONS.md`
 
-**Current phase: 2 (runner and tracing, LiteLLM backend) complete, awaiting go-ahead for 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`), then 3.** Update this line at the end of every phase.
+**Current phase: 2 complete and exercised with real Gemini and Groq runs. An open decision on the Groq model (gpt-oss-120b cannot use `python_exec`) is with the owner. Next: 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`), then 3.** Update this line at the end of every phase.
 
 ## How we work
 
@@ -78,6 +78,7 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `
 - `apps/api/src/arena/tools/`: the four arena tools and the `submit_answer` control tool.
 - `apps/api/src/arena/data/pricing.yaml`: the pricing table and the free-only guard's source of truth.
 - `apps/api/tests/fakes.py`: the scripted model client. Tests never call a real model.
+- `apps/api/tests/recorded/`: responses real providers returned, used as regression fixtures. When a real run breaks, save the response there (`arena run --dump-raw`) and write the test from it.
 - `apps/sandbox/src/sandbox/executor.py`: sandboxed execution. Its tests are escape attempts and must run inside the sandbox container.
 - `apps/web/src/lib/blind-view.ts`: the only redaction code. `apps/web/src/test/leak-scan.ts` is the check every blind response must pass.
 - `configs/`, `tasks/`: agent configs, prompts, tasks, fixtures, corpus.
@@ -114,7 +115,7 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `
 - Record both `cost_usd` (actually charged) and `reference_cost_usd` (at paid list price). Never present the reference figure as money spent.
 - Rate-limit waits are excluded from latency, timeouts, and replay pacing. A run interrupted by rate limiting is re-run, never recorded as an agent failure.
 - Model calls go through LiteLLM only. No provider SDKs.
-- Never hardcode API keys. Use `.env`; keep `.env.example` committed and current.
+- Never hardcode API keys. Real keys go in `.env` only. `.env.example` is committed to a public repo and must keep every secret empty; `pnpm lint` checks this.
 - No test may call a real model. Use the scripted fake client.
 - Recordings written to `data/recordings/` are scrubbed of API keys, auth headers, and `.env` values, and a test fails if a key-like pattern appears there.
 - Before recording all 120 runs, run the 10-run pilot, report tokens per run, pass rates, and the projected duration, and wait for approval.

@@ -26,13 +26,13 @@ TOOL_TIMEOUT_S = 30.0
 class RunLimits:
     """The same values apply to every config, so no config gets more room than another."""
 
-    max_total_tokens: int = 30_000
+    max_total_tokens: int = 16_000
     max_cost_usd: float = 0.50
     # Active time: model and tool latency. Waiting for a rate limit does not count.
     timeout_s: float = 120.0
     # Free tiers cap tokens per minute, so what a tool returns to the model is kept small.
     tool_output_chars: int = 2_000
-    max_completion_tokens: int = 2_048
+    max_completion_tokens: int = 1_024
     preview_chars: int = 600
 
 
@@ -67,7 +67,10 @@ class RunContext:
         self.stop_reason: StopReason | None = None
         # True when a rate limit cut the run short. Such a run is re-run, not scored.
         self.abandoned = False
+        # Model responses in a row that the provider rejected as unusable tool calls.
+        self.consecutive_rejections = 0
         self._previewed_upto = 0
+        self._trace_call_ids: dict[str, str] = {}
 
     @property
     def total_tokens(self) -> int:
@@ -120,6 +123,17 @@ class RunContext:
     def add_active_time(self, latency_ms: int) -> None:
         self.active_ms += latency_ms
 
+    def trace_call_id(self, provider_call_id: str) -> str:
+        """The id a tool call carries in the trace.
+
+        Provider ids stay in the conversation, where the provider needs them. They do
+        not go into the trace: their format identifies the provider, and some embed
+        long encrypted reasoning state.
+        """
+        if provider_call_id not in self._trace_call_ids:
+            self._trace_call_ids[provider_call_id] = f"call_{len(self._trace_call_ids) + 1}"
+        return self._trace_call_ids[provider_call_id]
+
     def _preview(self, message: Message) -> dict[str, Any]:
         content = message.get("content")
         text, truncated = truncate(
@@ -146,6 +160,7 @@ class RunContext:
         self.reference_cost_usd = round(self.reference_cost_usd + reference, 8)
         self.cost_usd = round(self.cost_usd + actual, 8)
         self.add_active_time(response.latency_ms)
+        self.consecutive_rejections = 0
 
         input_upto = len(self.messages)
         # The previous model output is already in the trace as its own event.
@@ -165,7 +180,7 @@ class RunContext:
                     "content": content if response.content is not None else None,
                     "tool_calls": [
                         {
-                            "call_id": call.call_id,
+                            "call_id": self.trace_call_id(call.call_id),
                             "tool": call.name,
                             "arguments": _display_arguments(call),
                         }
@@ -214,7 +229,7 @@ class RunContext:
             "tool_call",
             {
                 "step": self.steps,
-                "call_id": call.call_id,
+                "call_id": self.trace_call_id(call.call_id),
                 "tool": call.name,
                 "arguments": _display_arguments(call),
             },
@@ -236,7 +251,7 @@ class RunContext:
             "tool_result",
             {
                 "step": self.steps,
-                "call_id": call.call_id,
+                "call_id": self.trace_call_id(call.call_id),
                 "tool": call.name,
                 "output": text,
                 "truncated": truncated,

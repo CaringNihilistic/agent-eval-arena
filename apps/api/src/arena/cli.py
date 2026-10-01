@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -76,6 +77,9 @@ def run(
         bool, typer.Option("--allow-paid", help="Allow a model billed per token. Costs money.")
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Print raw events, one per line")] = False,
+    dump_raw: Annotated[
+        Path | None, typer.Option(help="Also write each raw provider response to this folder")
+    ] = None,
 ) -> None:
     """Run one config on one task and print the trace."""
     settings = get_settings()
@@ -105,18 +109,30 @@ def run(
     def show(event: Event) -> None:
         typer.echo(json.dumps(event) if as_json else describe(event))
 
+    llm = LiteLLMClient(dump_dir=dump_raw)
     try:
         result: RunResult = asyncio.run(
-            run_agent(agent_config, tasks[task], llm=LiteLLMClient(), settings=settings, sink=show)
+            run_agent(
+                agent_config,
+                tasks[task],
+                llm=llm,
+                settings=settings,
+                sink=show,
+            )
         )
     except (ModelNotAllowedError, BackendUnavailableError) as error:
         typer.echo(f"Refused: {error}", err=True)
         raise typer.Exit(3) from error
 
+    typer.echo(f"wall clock: {result.wall_clock_ms} ms", err=True)
     if result.stop_reason == "error" and not result.abandoned:
         raise typer.Exit(1)
     if result.abandoned:
-        typer.echo("The provider rate-limited this run. It should be re-run, not scored.", err=True)
+        typer.echo(
+            "The provider could not serve this run (rate limit or outage). "
+            "It should be re-run, not scored.",
+            err=True,
+        )
         raise typer.Exit(4)
 
 

@@ -21,3 +21,4 @@ coverage/
 .DS_Store
 .pnpm-store/
 .credentials.json
+.dev-dumps/

@@ -1,5 +1,6 @@
 """Runs one config on one task and returns the trace."""
 
+import time
 from dataclasses import dataclass, field
 
 from ulid import ULID
@@ -26,7 +27,10 @@ class RunResult:
     completion_tokens: int
     cost_usd: float
     reference_cost_usd: float
+    # Active time: model and tool latency.
     latency_ms: int
+    # Start to finish, including any waiting.
+    wall_clock_ms: int
     # True when a rate limit cut the run short: re-run it, do not score it.
     abandoned: bool
     events: list[Event] = field(default_factory=list)
@@ -73,6 +77,7 @@ async def run_agent(
             sink(event)
 
     run_id = str(ULID())
+    started = time.monotonic()
     ctx = RunContext(
         config=config,
         task=task,
@@ -119,6 +124,7 @@ async def run_agent(
         cost_usd=ctx.cost_usd,
         reference_cost_usd=ctx.reference_cost_usd,
         latency_ms=ctx.active_ms,
+        wall_clock_ms=int((time.monotonic() - started) * 1000),
         abandoned=ctx.abandoned,
         events=events,
     )

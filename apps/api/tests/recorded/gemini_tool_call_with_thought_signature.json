@@ -1,0 +1,64 @@
+{
+  "id": "Tc--apWMMIbFg8UPpr3XyQ0",
+  "created": 1790889804,
+  "model": "gemini-3.8-flash",
+  "object": "chat.completion",
+  "system_fingerprint": null,
+  "choices": [
+    {
+      "finish_reason": "tool_calls",
+      "index": 0,
+      "message": {
+        "content": null,
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "index": 0,
+            "provider_specific_fields": {
+              "thought_signature": "EpsCCpgCAWkUfRPfcZJmvB2mNqPayIQHNiJp/HvTJ5gVGLXDFZM1C5S0oPhbLZQXxH8N0jvkSJ+j4aNkgb29XymgP9o6IAplNzENnEaQJkhRwdVxuTrVNkBVWZCOfLPeOfig7ZIZg93r4bpC3C1PHjJRFar9F+8rG0t7PUiXtlCo5aDWdkJOt54JjEAVI7PhRGWvU3eD/R/i+GPwDdGh32JJ1rwFR6/Gau+8L9ODtqo/f55W36+F24PjlE+poylAW4MOgeXHhjrDDZDhOajmUpwMxEg6LxTMUNEh4KEx3Ia22v24YTjTuvhKyDpzpWtGxB4dXfybRoqFJyxlwO2lGYcPT1BlPAFIxyOxcifX98vah+z/jyEVCMkNwzjD9Q=="
+            },
+            "function": {
+              "arguments": "{\"code\": \"import os\\nimport pandas as pd\\n\\nfixtures_dir = os.environ.get('FIXTURES_DIR', '.')\\ndf = pd.read_csv(os.path.join(fixtures_dir, 'dev_sales.csv'))\\nprint(df.head())\\ndf['revenue'] = df['units'] * df['unit_price']\\nregion_rev = df.groupby('region')['revenue'].sum()\\nprint(region_rev)\\nprint(\\\"Highest:\\\", region_rev.idxmax())\\n\"}",
+              "name": "python_exec"
+            },
+            "id": "call_138391__thought__EpsCCpgCAWkUfRPfcZJmvB2mNqPayIQHNiJp/HvTJ5gVGLXDFZM1C5S0oPhbLZQXxH8N0jvkSJ+j4aNkgb29XymgP9o6IAplNzENnEaQJkhRwdVxuTrVNkBVWZCOfLPeOfig7ZIZg93r4bpC3C1PHjJRFar9F+8rG0t7PUiXtlCo5aDWdkJOt54JjEAVI7PhRGWvU3eD/R/i+GPwDdGh32JJ1rwFR6/Gau+8L9ODtqo/f55W36+F24PjlE+poylAW4MOgeXHhjrDDZDhOajmUpwMxEg6LxTMUNEh4KEx3Ia22v24YTjTuvhKyDpzpWtGxB4dXfybRoqFJyxlwO2lGYcPT1BlPAFIxyOxcifX98vah+z/jyEVCMkNwzjD9Q==",
+            "type": "function"
+          }
+        ],
+        "function_call": null,
+        "images": [],
+        "thinking_blocks": [],
+        "provider_specific_fields": {
+          "thought_signatures": [
+            "EpsCCpgCAWkUfRPfcZJmvB2mNqPayIQHNiJp/HvTJ5gVGLXDFZM1C5S0oPhbLZQXxH8N0jvkSJ+j4aNkgb29XymgP9o6IAplNzENnEaQJkhRwdVxuTrVNkBVWZCOfLPeOfig7ZIZg93r4bpC3C1PHjJRFar9F+8rG0t7PUiXtlCo5aDWdkJOt54JjEAVI7PhRGWvU3eD/R/i+GPwDdGh32JJ1rwFR6/Gau+8L9ODtqo/f55W36+F24PjlE+poylAW4MOgeXHhjrDDZDhOajmUpwMxEg6LxTMUNEh4KEx3Ia22v24YTjTuvhKyDpzpWtGxB4dXfybRoqFJyxlwO2lGYcPT1BlPAFIxyOxcifX98vah+z/jyEVCMkNwzjD9Q=="
+          ]
+        }
+      },
+      "provider_specific_fields": {
+        "native_finish_reason": "STOP"
+      }
+    }
+  ],
+  "usage": {
+    "completion_tokens": 178,
+    "prompt_tokens": 682,
+    "total_tokens": 860,
+    "completion_tokens_details": {
+      "reasoning_tokens": 53,
+      "text_tokens": 125
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cached_tokens": null,
+      "text_tokens": 682,
+      "image_tokens": null,
+      "video_tokens": null
+    },
+    "cache_read_input_tokens": null
+  },
+  "vertex_ai_grounding_metadata": [],
+  "vertex_ai_url_context_metadata": [],
+  "vertex_ai_safety_results": [],
+  "vertex_ai_citation_metadata": [],
+  "service_tier": "default"
+}

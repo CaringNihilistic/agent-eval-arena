@@ -100,7 +100,7 @@ flowchart LR
 
 - **Answer extraction.** A control tool `submit_answer(answer: string)` is always available and is not part of `enabled_tools`. A plain-text reply with no tool call is also accepted as the final answer. Tool choice is never forced.
 - **Limits.** `max_steps` (config), `max_total_tokens`, `max_cost_usd`, and a timeout on active time. Each ends the run cleanly with its own `stop_reason`, and the run is then scored as normal.
-- **Small contexts.** Free tiers cap tokens per minute (8,000 on Groq), so tool output returned to the model is truncated to a fixed budget and the per-run token limit is set so a single request stays under that cap. The same limits apply to every config.
+- **Small contexts.** Free tiers cap tokens per minute (8,000 on Groq), so tool output returned to the model is truncated to 2,000 characters, a completion is capped at 1,024 tokens, and a run at 16,000 tokens. These were set from the first real runs, where single requests stayed under 1,600 prompt tokens. The same limits apply to every config.
 - **Conversation store.** The conversation is append-only in `run_messages`, keeping each provider message verbatim, including reasoning fields that providers require to be passed back unchanged.
 - **Temperature.** Nullable. When null the parameter is omitted from the request.
 

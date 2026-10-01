@@ -1,0 +1,48 @@
+{
+  "id": "chatcmpl-53bd54b5-e627-46b9-a1d6-55e858beb5d8",
+  "created": 1790889460,
+  "model": "openai/gpt-oss-120b",
+  "object": "chat.completion",
+  "system_fingerprint": "fp_c800245357",
+  "choices": [
+    {
+      "finish_reason": "tool_calls",
+      "index": 0,
+      "message": {
+        "content": null,
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": "{\"expression\":\"(37 * 4.85) + (12 * 13.40)\"}",
+              "name": "calculator"
+            },
+            "id": "fc_04c0f915-e773-44ec-bbbd-671cec2ef0d6",
+            "type": "function"
+          }
+        ],
+        "function_call": null,
+        "reasoning": "We need compute total cost: 37 * 4.85 =? 12 * 13.40 =? Sum. Then if total > 300 apply 8% off (i.e., multiply by 0.92). Compute final total, round to two decimals.\n\nLet's calculate using calculator tool."
+      }
+    }
+  ],
+  "usage": {
+    "completion_tokens": 105,
+    "prompt_tokens": 476,
+    "total_tokens": 581,
+    "completion_tokens_details": {
+      "reasoning_tokens": 64
+    },
+    "prompt_tokens_details": null,
+    "queue_time": 0.324116689,
+    "prompt_time": 0.027963596,
+    "completion_time": 0.217345143,
+    "total_time": 0.245308739
+  },
+  "usage_breakdown": null,
+  "x_groq": {
+    "id": "req_01m3wn904yefnaamnppgm362qt",
+    "seed": 604597162
+  },
+  "service_tier": "auto"
+}

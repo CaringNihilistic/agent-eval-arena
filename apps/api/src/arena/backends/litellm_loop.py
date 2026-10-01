@@ -11,7 +11,13 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from arena.llm import LLMCallError, LLMClient, RateLimitedError, ToolCallRequest
+from arena.llm import (
+    InvalidToolCallError,
+    LLMCallError,
+    LLMClient,
+    ProviderUnavailableError,
+    ToolCallRequest,
+)
 from arena.run_context import RunContext, StopReason
 from arena.tools.registry import SUBMIT_ANSWER, tool_schemas
 
@@ -22,6 +28,10 @@ class LoopState(TypedDict):
 
 
 Route = Literal["continue", "finish"]
+
+# A model that repeats an unusable tool call this many times in a row is not going
+# to recover, and each attempt still counts against the provider's rate limit.
+MAX_REJECTED_TOOL_CALLS = 3
 
 
 class LiteLLMLoopBackend:
@@ -77,10 +87,29 @@ class LiteLLMLoopBackend:
         except TimeoutError:
             ctx.error("the model call ran past the run's time limit", recoverable=False)
             return _end_step(ctx, "timeout")
-        except RateLimitedError as error:
+        except ProviderUnavailableError as error:
             ctx.abandoned = True
-            ctx.error(f"rate limited by the provider: {error}", recoverable=True)
+            ctx.error(f"the provider could not serve the call: {error}", recoverable=True)
             return _end_step(ctx, "error")
+        except InvalidToolCallError as error:
+            # The provider discarded the response. Tell the model, as we would for
+            # any other unusable tool call, and let it try again. This uses a step.
+            ctx.add_active_time(error.latency_ms)
+            ctx.consecutive_rejections += 1
+            if ctx.consecutive_rejections >= MAX_REJECTED_TOOL_CALLS:
+                ctx.error(
+                    f"the model made {MAX_REJECTED_TOOL_CALLS} unusable tool calls in a row: "
+                    f"{error.provider_message}",
+                    recoverable=False,
+                )
+                return _end_step(ctx, "error")
+            ctx.error(
+                f"the provider rejected the model's tool call: {error.provider_message}",
+                recoverable=True,
+            )
+            ctx.messages.append({"role": "user", "content": _rejection_notice(ctx, error)})
+            ctx.finish_step()
+            return []
         except LLMCallError as error:
             ctx.error(f"the model call failed: {error}", recoverable=False)
             return _end_step(ctx, "error")
@@ -109,8 +138,20 @@ def _end_step(ctx: RunContext, reason: StopReason) -> list[ToolCallRequest]:
     return []
 
 
+def _rejection_notice(ctx: RunContext, error: InvalidToolCallError) -> str:
+    names = ", ".join([*ctx.tools, SUBMIT_ANSWER])
+    return (
+        f"Your last response was rejected and not used: {error.provider_message}. "
+        f"The only tools that exist are: {names}. Call one of them, with its arguments "
+        "as a JSON object."
+    )
+
+
 async def _act(ctx: RunContext, calls: list[ToolCallRequest]) -> None:
     """Run the requested tools in order and put each result into the conversation."""
+    if not calls:
+        # The step was already closed without tool calls; go back to the model.
+        return
     for call in calls:
         content = await ctx.execute_tool(call)
         ctx.messages.append({"role": "tool", "tool_call_id": call.call_id, "content": content})

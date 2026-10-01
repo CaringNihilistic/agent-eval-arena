@@ -7,7 +7,7 @@
     "dev:local": "docker compose up -d --wait api sandbox && pnpm --filter web dev",
     "dev:stop": "docker compose --profile web down",
     "web:prodcheck": "docker compose --profile web up web",
-    "lint": "pnpm lint:web && pnpm format:check && pnpm lint:py && pnpm schema:check",
+    "lint": "node scripts/check-env-example.mjs && pnpm lint:web && pnpm format:check && pnpm lint:py && pnpm schema:check",
     "lint:web": "pnpm --filter web lint",
     "lint:py": "node scripts/py.mjs api ruff check . && node scripts/py.mjs api ruff format --check . && node scripts/py.mjs sandbox ruff check . && node scripts/py.mjs sandbox ruff format --check .",
     "format": "prettier --write . && node scripts/py.mjs api ruff format . ../sandbox",
