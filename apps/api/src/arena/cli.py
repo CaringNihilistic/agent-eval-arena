@@ -9,6 +9,7 @@ from typing import Annotated, Any
 import typer
 
 from arena.backends.base import BackendUnavailableError
+from arena.backends.claude_auth import SubscriptionAuthError
 from arena.config import load_config, load_configs, load_tasks
 from arena.events import Event
 from arena.llm import LiteLLMClient
@@ -78,7 +79,11 @@ def run(
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Print raw events, one per line")] = False,
     dump_raw: Annotated[
-        Path | None, typer.Option(help="Also write each raw provider response to this folder")
+        Path | None,
+        typer.Option(
+            help="Also write raw provider traffic to this folder: responses for the LiteLLM "
+            "backend, request and response bodies for the Claude backend"
+        ),
     ] = None,
 ) -> None:
     """Run one config on one task and print the trace."""
@@ -109,7 +114,7 @@ def run(
     def show(event: Event) -> None:
         typer.echo(json.dumps(event) if as_json else describe(event))
 
-    llm = LiteLLMClient(dump_dir=dump_raw)
+    llm = LiteLLMClient(dump_dir=dump_raw) if agent_config.backend == "litellm" else None
     try:
         result: RunResult = asyncio.run(
             run_agent(
@@ -118,13 +123,24 @@ def run(
                 llm=llm,
                 settings=settings,
                 sink=show,
+                raw_request_dir=dump_raw,
             )
         )
-    except (ModelNotAllowedError, BackendUnavailableError) as error:
+    except (ModelNotAllowedError, BackendUnavailableError, SubscriptionAuthError) as error:
         typer.echo(f"Refused: {error}", err=True)
         raise typer.Exit(3) from error
 
     typer.echo(f"wall clock: {result.wall_clock_ms} ms", err=True)
+    for key in ("harness_version", "account_models"):
+        if result.backend_info.get(key):
+            typer.echo(f"{key}: {result.backend_info[key]}", err=True)
+    estimate = result.backend_info.get("sdk_cost_estimate_usd")
+    if estimate is not None:
+        typer.echo(
+            f"Claude Agent SDK's own cost estimate: ${estimate:.6f} "
+            f"(our table: ${result.reference_cost_usd:.6f}); nothing was charged",
+            err=True,
+        )
     if result.stop_reason == "error" and not result.abandoned:
         raise typer.Exit(1)
     if result.abandoned:

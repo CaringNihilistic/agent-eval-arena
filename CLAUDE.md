@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current phase: 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`) in progress. Next: 3.** Update this line at the end of every phase.
+**Current phase: 2b (Claude subscription backend) complete, awaiting go-ahead for Phase 3 (task bank and scorers). The five-run Claude usage pilot follows Phase 3.** Update this line at the end of every phase.
 
 ## How we work
 
@@ -68,6 +68,7 @@ pnpm schema:check                      # fail if generated types are stale
 node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 docker compose exec api uv run arena list
 docker compose exec api uv run arena run --config qwen-full --task dev-math-01
+docker compose exec api uv run arena run --config claude-haiku-full --task dev-math-01   # uses the subscription
 ```
 
 Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `arena export` (Phase 4), `arena record --pilot` (Phase 8).
@@ -75,7 +76,9 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `
 ## Where things are (backend)
 
 - `apps/api/src/arena/run_context.py`: limits, tool execution, cost, and event emission for one run. Shared by every backend; put anything a second loop would also need here, not in a backend.
-- `apps/api/src/arena/backends/`: agent loops. `litellm_loop.py` is the LangGraph loop; `base.py` is the interface.
+- `apps/api/src/arena/backends/`: agent loops. `litellm_loop.py` is the LangGraph loop; `agent_sdk.py` drives Claude Code through the Claude Agent SDK; `claude_auth.py` holds the checks that keep Claude runs on the subscription login; `base.py` is the interface.
+- `apps/api/src/arena/scrub.py`: removes credentials from everything that is stored. `apps/api/tests/test_no_secrets.py` scans the repository.
+- `apps/api/tests/fake_sdk.py`: the scripted Claude SDK client. It replays events in the order a real session produced them.
 - `apps/api/src/arena/tools/`: the four arena tools and the `submit_answer` control tool.
 - `apps/api/src/arena/data/pricing.yaml`: the pricing table and the free-only guard's source of truth.
 - `apps/api/tests/fakes.py`: the scripted model client. Tests never call a real model.
@@ -115,7 +118,9 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `
 - Model names, free-tier limits, and prices come from official provider pages, never from memory. Record the source URL and the date checked in the pricing table and in `docs/DECISIONS.md`.
 - Record both `cost_usd` (actually charged) and `reference_cost_usd` (at paid list price). Never present the reference figure as money spent.
 - Rate-limit waits are excluded from latency, timeouts, and replay pacing. A run interrupted by rate limiting is re-run, never recorded as an agent failure.
-- Model calls go through LiteLLM only. No provider SDKs.
+- Gemini and Groq calls go through LiteLLM. Claude calls go only through the Claude Agent SDK on the owner's subscription login (`CLAUDE_CODE_OAUTH_TOKEN`). Never send a Claude request with an API key, and never set `ANTHROPIC_API_KEY` or any variable in `claude_auth.FORBIDDEN_VARIABLES`.
+- The Claude backend is local only. It is never deployed, and nothing in `apps/web` may reference it.
+- Claude runs use the owner's Pro allowance. Do not run them without being asked, keep them sequential, and stop cleanly at a usage limit.
 - Never hardcode API keys. Real keys go in `.env` only. `.env.example` is committed to a public repo and must keep every secret empty; `pnpm lint` checks this.
 - No test may call a real model. Use the scripted fake client.
 - Recordings written to `data/recordings/` are scrubbed of API keys, auth headers, and `.env` values, and a test fails if a key-like pattern appears there.

@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
-from arena.backends.base import BackendUnavailableError
+from arena.backends.claude_auth import SubscriptionAuthError
 from arena.llm import LLMCallError, LLMResponse, RateLimitedError, ToolCallRequest
 from arena.pricing import ModelNotAllowedError
 from arena.run_context import RunLimits
@@ -428,10 +428,10 @@ async def test_an_unknown_model_is_refused_even_with_the_paid_override(tmp_path:
     assert llm.calls == 0
 
 
-async def test_the_agent_sdk_backend_is_not_available_yet(tmp_path: Path) -> None:
+async def test_a_claude_config_without_a_subscription_login_is_refused(tmp_path: Path) -> None:
     llm = ScriptedLLM(says("x"))
 
-    with pytest.raises(BackendUnavailableError):
+    with pytest.raises(SubscriptionAuthError, match="CLAUDE_CODE_OAUTH_TOKEN is not set"):
         await run(
             tmp_path, llm, config={"model": "test/subscription-model", "backend": "agent_sdk"}
         )

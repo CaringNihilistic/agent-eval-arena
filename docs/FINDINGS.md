@@ -52,3 +52,20 @@ Groq rejects the whole response with HTTP 400, code `tool_use_failed`, message "
 ## 4. Groq's published and enforced limits differ
 
 **Observed 2026-10-02.** Groq's rate-limit page lists 8,000 tokens per minute for `qwen/qwen3.8-27b`. The 429 the API returned names a limit of 7,000 **input** tokens per minute. Two runs back to back exceed it; the recorder has to pace on the enforced figure.
+
+## 5. The Claude Agent SDK adds context and settings of its own (README)
+
+**Observed 2026-10-02**, Claude Agent SDK 0.2.163, Claude Code 2.1.286, model `claude-haiku-4-5`, subscription login.
+
+With a custom system prompt, every built-in tool removed, and no settings loaded, each request still carries:
+
+- two extra system-prompt blocks ahead of ours: a billing header line, and "You are a Claude agent, built on Anthropic's Claude Agent SDK.";
+- three `<system-reminder>` blocks ahead of the task: the environment, the model's name and knowledge cutoff, and today's date;
+- extended thinking enabled with a 31,999-token budget and `max_tokens` of 32,000, on every model including Haiku;
+- prompt caching with a one-hour lifetime.
+
+The tools are exactly ours, renamed `mcp__arena__<name>`.
+
+**Consequence.** Claude configs do not run under the same request settings as the Gemini and Groq configs: they think, they are not capped at 1,024 completion tokens per call, and each request has about 1,600 tokens of fixed input overhead. This is part of the loop confound between backends and is why matches and the Elo board are kept within a backend.
+
+**Evidence.** `docs/findings/claude-agent-sdk-request/first-request.json` is the first request of the smoke run, with the account identifier removed.

@@ -69,6 +69,10 @@ class RunContext:
         self.abandoned = False
         # Model responses in a row that the provider rejected as unusable tool calls.
         self.consecutive_rejections = 0
+        # When the subscription's usage limit resets, if that is what stopped the run.
+        self.usage_limit_resets_at: int | None = None
+        # Facts about the backend that are not part of the trace.
+        self.backend_info: dict[str, Any] = {}
         self._previewed_upto = 0
         self._trace_call_ids: dict[str, str] = {}
 
@@ -224,6 +228,11 @@ class RunContext:
 
     async def execute_tool(self, call: ToolCallRequest) -> str:
         """Run one tool call, emit its events, and return the text the model sees."""
+        text, _success = await self.execute_tool_detailed(call)
+        return text
+
+    async def execute_tool_detailed(self, call: ToolCallRequest) -> tuple[str, bool]:
+        """As execute_tool, also saying whether the tool succeeded."""
         self.tool_calls += 1
         self.emitter.emit(
             "tool_call",
@@ -260,7 +269,7 @@ class RunContext:
                 "error": result.error,
             },
         )
-        return text
+        return text, result.success
 
 
 def _display_arguments(call: ToolCallRequest) -> dict[str, Any]:

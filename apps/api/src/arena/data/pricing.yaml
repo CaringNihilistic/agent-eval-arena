@@ -71,3 +71,44 @@ models:
       requests_per_day: 1000
       tokens_per_minute: 7000
       tokens_per_day: 200000
+
+  # Claude models run only through the Claude Agent SDK on the owner's subscription
+  # login. Nothing is charged per token. The reference prices are Anthropic's API
+  # list prices; cache writes use the 1-hour rate, which is what subscription
+  # sessions request. Requesting one of these through LiteLLM is refused.
+
+  claude-opus-5-5:
+    provider: anthropic
+    billing: subscription
+    backends: [agent_sdk]
+    reference:
+      input_per_mtok: 4.00
+      output_per_mtok: 20.00
+      cache_read_per_mtok: 0.20
+      cache_write_per_mtok: 8.00
+      source: https://platform.claude.com/docs/en/about-claude/pricing
+      checked: 2026-10-01
+
+  claude-sonnet-5-5:
+    provider: anthropic
+    billing: subscription
+    backends: [agent_sdk]
+    reference:
+      input_per_mtok: 2.00
+      output_per_mtok: 10.00
+      cache_read_per_mtok: 0.20
+      cache_write_per_mtok: 4.00
+      source: https://platform.claude.com/docs/en/about-claude/pricing
+      checked: 2026-10-01
+
+  claude-haiku-4-5:
+    provider: anthropic
+    billing: subscription
+    backends: [agent_sdk]
+    reference:
+      input_per_mtok: 1.00
+      output_per_mtok: 5.00
+      cache_read_per_mtok: 0.10
+      cache_write_per_mtok: 2.00
+      source: https://platform.claude.com/docs/en/about-claude/pricing
+      checked: 2026-10-01

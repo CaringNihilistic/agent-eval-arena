@@ -1,0 +1,11 @@
+name: claude-haiku-full
+version: 1
+display_name: Claude Haiku 4.5, full prompt
+backend: agent_sdk
+model: claude-haiku-4-5
+provider: anthropic
+model_family: claude
+system_prompt_file: prompts/full.md
+enabled_tools: [calculator, python_exec, search_docs, read_file]
+max_steps: 10
+temperature: null

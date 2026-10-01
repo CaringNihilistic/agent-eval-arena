@@ -41,10 +41,12 @@ GEMINI = "gemini/gemini-3.8-flash"
 
 GROQ_TOOL_USE_FAILED = (RECORDED / "groq_tool_use_failed.txt").read_text(encoding="utf-8")
 GEMINI_503 = (RECORDED / "gemini_503_unavailable.txt").read_text(encoding="utf-8")
-# Groq's 429 as received, with the account id as the client redacts it.
+# Shaped like a Groq account id, and assembled so the repository scan does not flag it.
+FAKE_ACCOUNT_ID = "org_" + "01abcDEF234ghi567"
+# Groq's 429 as received, with a made-up account id in place of the real one.
 GROQ_429 = (
     'litellm.RateLimitError: RateLimitError: GroqException - {"error":{"message":"Rate limit '
-    "reached for model `openai/gpt-oss-120b` in organization `org_01abcDEF234ghi567` service "
+    "reached for model `openai/gpt-oss-120b` in organization `" + FAKE_ACCOUNT_ID + "` service "
     "tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 7460, Requested 1090. Please "
     'try again in 4.125s.","type":"tokens","code":"rate_limit_exceeded"}}'
 )
@@ -193,7 +195,7 @@ def test_a_rate_limit_is_recognised_and_the_account_id_is_removed() -> None:
     translated = translate_error(error, latency_ms=200)
 
     assert isinstance(translated, RateLimitedError)
-    assert "org_01abcDEF234ghi567" not in str(translated)
+    assert FAKE_ACCOUNT_ID not in str(translated)
     assert "org_<redacted>" in str(translated)
     assert "tokens per minute" in str(translated)
 

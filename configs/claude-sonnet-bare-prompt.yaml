@@ -1,0 +1,11 @@
+name: claude-sonnet-bare-prompt
+version: 1
+display_name: Claude Sonnet 5.5, bare prompt
+backend: agent_sdk
+model: claude-sonnet-5-5
+provider: anthropic
+model_family: claude
+system_prompt_file: prompts/bare.md
+enabled_tools: [calculator, python_exec, search_docs, read_file]
+max_steps: 10
+temperature: null

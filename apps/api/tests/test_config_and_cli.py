@@ -28,6 +28,15 @@ def test_committed_configs_form_the_controlled_pairs() -> None:
     assert differing_fields("qwen-full", "qwen-two-tools") == {"enabled_tools"}
     assert differing_fields("gemini-full", "qwen-full") == {"model", "provider", "model_family"}
     assert configs["gemini-bare-prompt"].system_prompt == "Answer the question."
+    assert differing_fields("claude-sonnet-full", "claude-sonnet-bare-prompt") == {"system_prompt"}
+    assert differing_fields("claude-opus-full", "claude-sonnet-full") == {"model"}
+    assert differing_fields("claude-sonnet-full", "claude-haiku-full") == {"model"}
+    # The Claude and free-tier configs share the same two prompt texts and tool set.
+    assert configs["claude-sonnet-full"].system_prompt == configs["gemini-full"].system_prompt
+    assert configs["claude-sonnet-bare-prompt"].system_prompt == "Answer the question."
+    assert configs["claude-opus-full"].enabled_tools == configs["gemini-full"].enabled_tools
+    assert {c.backend for n, c in configs.items() if n.startswith("claude-")} == {"agent_sdk"}
+    assert len(configs) == 8
     assert {config.max_steps for config in configs.values()} == {10}
     assert {config.temperature for config in configs.values()} == {None}
 
@@ -174,6 +183,16 @@ def test_cli_refuses_a_paid_model_without_calling_it(
     assert result.exit_code == 3
     assert "Refused" in result.output
     assert "no entry in the pricing table" in result.output
+
+
+def test_cli_refuses_a_claude_config_without_a_subscription_login() -> None:
+    result = runner.invoke(
+        cli.app, ["run", "--config", "claude-haiku-full", "--task", "dev-math-01"]
+    )
+
+    assert result.exit_code == 3
+    assert "Refused" in result.output
+    assert "CLAUDE_CODE_OAUTH_TOKEN is not set" in result.output
 
 
 def test_cli_stops_early_when_the_provider_key_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:

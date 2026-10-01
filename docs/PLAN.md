@@ -420,6 +420,7 @@ The stat is only meaningful because voters cannot see pass/fail, score, cost, or
 - **Cost.** Every run used a free tier and cost $0. The "at paid rates" figures apply the providers' published list prices to the measured token counts, with sources and the date checked.
 - **Latency.** Measured on free tiers, which can be slower than paid ones. Waiting for rate limits is excluded.
 - **Elo.** K=32, start 1000, replayed in vote order; intervals from a seeded bootstrap.
+- **Two agent loops.** Claude configs run Claude Code's loop through the Claude Agent SDK; Gemini and Qwen configs run the arena's own loop. Claude Code adds context and settings of its own to every request (see `FINDINGS.md`), so comparisons across the two groups mix the model with the loop. Matches and the Elo board stay within a group; the objective table shows all eight configs with this caveat.
 - **Limits of the data.** One recorded run per config per task; model output is not deterministic; votes on a public demo can be manipulated.
 
 ## 8. Recording within free-tier limits

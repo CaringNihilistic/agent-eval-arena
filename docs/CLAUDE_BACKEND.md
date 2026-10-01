@@ -215,3 +215,40 @@ That keeps the confound out of the human-preference ratings entirely. The altern
 
 - **Section 7, pilot.** Phase 2b ends with a single smoke run that confirms subscription auth, the custom prompt, and the tool setup, and shows the owner the captured raw request. The five-run usage pilot moves to after Phase 3, on real tasks from the bank, so its numbers are representative.
 - **One implementation per piece of logic.** Elo, confidence intervals, the agreement stat, and blind-view redaction exist only in TypeScript. Python does not compute them.
+
+## 11. What the build and the smoke test showed (2026-10-02)
+
+Built as `apps/api/src/arena/backends/agent_sdk.py` and `claude_auth.py`, with Claude Agent SDK 0.2.163 and its bundled Claude Code 2.1.286.
+
+**Smoke run.** `claude-haiku-full` on `dev-math-01`: answered 313.03 (correct) in 3 steps, 5,477 input and 545 output tokens, 6.1 seconds active, 7.8 seconds wall clock. Actual cost $0; reference cost $0.008202, which matches the SDK's own estimate to the last digit.
+
+**Confirmed.**
+
+- The session reports `apiKeySource: "none"`, which is what a subscription login looks like. Any other value aborts the run before a model call.
+- The session's tools were exactly the arena's five (four tools and `submit_answer`), all prefixed `mcp__arena__`. No built-in tool was present.
+- A `PostToolUse` hook ends the session with no further model call once the run has stopped. Submitting an answer costs no extra request.
+- The usage status reported with each response includes whether extra usage would be accepted. It read `rejected`, meaning extra usage is off. The backend now refuses to continue if it ever reads `allowed`.
+
+**What each request contains besides our prompt and tools.** From the captured request (`docs/findings/claude-agent-sdk-request/first-request.json`):
+
+| Where                  | What Claude Code adds                                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| System prompt, block 1 | A billing header line: `x-anthropic-billing-header: cc_version=…; cc_entrypoint=sdk-py; …`                                                                               |
+| System prompt, block 2 | "You are a Claude agent, built on Anthropic's Claude Agent SDK."                                                                                                         |
+| System prompt, block 3 | Our prompt, unchanged                                                                                                                                                    |
+| First user message     | Three `<system-reminder>` blocks before the task: the environment (working directory, platform, OS version), the model's name and knowledge cutoff, and today's date     |
+| Tools                  | Ours only, named `mcp__arena__<name>`                                                                                                                                    |
+| Request settings       | `max_tokens: 32000`; extended thinking enabled with a 31,999-token budget; prompt caching with a one-hour lifetime; a context-management rule that keeps thinking blocks |
+
+`CLAUDE_CODE_DISABLE_ATTACHMENTS` did not remove the three reminders. The only mode that drops them does not accept a subscription token.
+
+**Differences from the LiteLLM backend that follow from this.**
+
+1. **The per-call completion cap is not applied.** Gemini and Groq calls are capped at 1,024 completion tokens; Claude Code sends 32,000 and enables thinking. The per-run token cap, the step limit, the tool-output cap, and the time limit are enforced identically, by the shared counters.
+2. **Thinking is on for every Claude model, including Haiku**, because Claude Code turns it on. The configs still set no effort or thinking option.
+3. **Each request carries about 1,600 input tokens of fixed overhead** (the tool-use preamble, five tool schemas, and the reminders), so a three-step run used about 6,000 tokens against about 1,900 on Groq. The 16,000-token run cap therefore binds sooner for Claude configs.
+4. **The trace's input preview shows our system prompt and the task**, not the harness's additions. They are documented here and on `/about`.
+
+**Tool timing.** Claude Code can start a tool before the model response has finished streaming. The backend holds each tool, in the `PreToolUse` hook, until that response is recorded, so trace events stay in order.
+
+**Development calls.** Building this used two real sessions on the subscription before the smoke run: one probe of the SDK's event order (two Haiku requests) and the smoke run itself (three Haiku requests).

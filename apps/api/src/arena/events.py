@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from arena.schema_gen import TraceEvent
+from arena.scrub import scrub, secret_values
 
 Event = dict[str, Any]
 Sink = Callable[[Event], None]
@@ -21,6 +22,8 @@ class Emitter:
         self.run_id = run_id
         self._sink = sink
         self._seq = 0
+        # Read once per run: the credentials that must never appear in an event.
+        self._secrets = secret_values()
 
     def emit(self, event_type: str, payload: dict[str, Any]) -> Event:
         event: Event = {
@@ -30,7 +33,7 @@ class Emitter:
             "type": event_type,
             "timestamp": datetime.now(UTC).isoformat(),
             "redacted": False,
-            "payload": payload,
+            "payload": scrub(payload, self._secrets),
         }
         # An event that does not match the schema is a bug; fail before it is stored.
         _ADAPTER.validate_python(event)
