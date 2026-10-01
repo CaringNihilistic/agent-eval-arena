@@ -1,10 +1,10 @@
-name: oss-two-tools
+name: qwen-two-tools
 version: 1
-display_name: gpt-oss-120b, two tools
+display_name: Qwen 3.8 27B, two tools
 backend: litellm
-model: groq/openai/gpt-oss-120b
+model: groq/qwen/qwen3.8-27b
 provider: groq
-model_family: gpt-oss
+model_family: qwen
 system_prompt_file: prompts/full.md
 enabled_tools: [calculator, read_file]
 max_steps: 10

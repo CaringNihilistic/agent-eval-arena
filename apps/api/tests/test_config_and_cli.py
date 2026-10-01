@@ -25,8 +25,8 @@ def test_committed_configs_form_the_controlled_pairs() -> None:
         return {key for key in left if key not in ignore and left[key] != right[key]}
 
     assert differing_fields("gemini-full", "gemini-bare-prompt") == {"system_prompt"}
-    assert differing_fields("oss-full", "oss-two-tools") == {"enabled_tools"}
-    assert differing_fields("gemini-full", "oss-full") == {"model", "provider", "model_family"}
+    assert differing_fields("qwen-full", "qwen-two-tools") == {"enabled_tools"}
+    assert differing_fields("gemini-full", "qwen-full") == {"model", "provider", "model_family"}
     assert configs["gemini-bare-prompt"].system_prompt == "Answer the question."
     assert {config.max_steps for config in configs.values()} == {10}
     assert {config.temperature for config in configs.values()} == {None}
@@ -136,7 +136,7 @@ def test_cli_lists_configs_and_tasks() -> None:
 
     assert result.exit_code == 0
     assert "gemini-full" in result.output
-    assert "oss-two-tools" in result.output
+    assert "qwen-two-tools" in result.output
     assert "dev-math-01" in result.output
 
 

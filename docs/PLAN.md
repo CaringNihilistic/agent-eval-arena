@@ -371,26 +371,27 @@ Because free-tier inputs may be reviewed or used for training, tasks contain onl
 
 ### 7.4 Free-tier configs (approved)
 
-| Config               | Model                      | Prompt                           | Tools                     |
-| -------------------- | -------------------------- | -------------------------------- | ------------------------- |
-| `gemini-full`        | `gemini/gemini-3.8-flash`  | Full agent prompt                | All four                  |
-| `gemini-bare-prompt` | `gemini/gemini-3.8-flash`  | One line: "Answer the question." | All four                  |
-| `oss-full`           | `groq/openai/gpt-oss-120b` | Full agent prompt                | All four                  |
-| `oss-two-tools`      | `groq/openai/gpt-oss-120b` | Full agent prompt                | `calculator`, `read_file` |
+| Config               | Model                     | Prompt                           | Tools                     |
+| -------------------- | ------------------------- | -------------------------------- | ------------------------- |
+| `gemini-full`        | `gemini/gemini-3.8-flash` | Full agent prompt                | All four                  |
+| `gemini-bare-prompt` | `gemini/gemini-3.8-flash` | One line: "Answer the question." | All four                  |
+| `qwen-full`          | `groq/qwen/qwen3.8-27b`   | Full agent prompt                | All four                  |
+| `qwen-two-tools`     | `groq/qwen/qwen3.8-27b`   | Full agent prompt                | `calculator`, `read_file` |
 
 - **Prompt pair:** `gemini-full` and `gemini-bare-prompt` differ only in the system prompt.
-- **Tools pair:** `oss-full` and `oss-two-tools` differ only in enabled tools.
-- **Model pair:** `gemini-full` and `oss-full` differ only in the model, a third controlled comparison.
-- **Two model families:** Gemini (Google) and gpt-oss (OpenAI's open-weight line).
+- **Tools pair:** `qwen-full` and `qwen-two-tools` differ only in enabled tools.
+- **Model pair:** `gemini-full` and `qwen-full` differ only in the model, a third controlled comparison.
+- **Two model families:** Gemini (Google) and Qwen (Alibaba), served by Groq.
+- **Why not gpt-oss-120b:** it was the first choice for Groq, but it calls its built-in `python` tool instead of `python_exec` and cannot run code in the arena. See `FINDINGS.md`.
 - **Held equal across all four:** `max_steps` 10, temperature unset, the same token and tool-output limits, no reasoning-effort overrides.
 - **Full agent prompt:** plan briefly, pick the tool that fits, check a result with a tool before answering, and submit the answer in the format the task asks for.
 
 Reference prices for the "at paid rates" column, per million tokens:
 
-| Model                        | Input | Output | Source                                        | Note                                                |
-| ---------------------------- | ----- | ------ | --------------------------------------------- | --------------------------------------------------- |
-| `gemini-3.8-flash`           | $0.75 | $3.75  | https://ai.google.dev/gemini-api/docs/pricing | Promotional through 2026-12-31; $1.50 / $7.50 after |
-| `openai/gpt-oss-120b` (Groq) | $0.15 | $0.60  | https://console.groq.com/docs/models          |                                                     |
+| Model                     | Input | Output | Source                                        | Note                                                |
+| ------------------------- | ----- | ------ | --------------------------------------------- | --------------------------------------------------- |
+| `gemini-3.8-flash`        | $0.75 | $3.75  | https://ai.google.dev/gemini-api/docs/pricing | Promotional through 2026-12-31; $1.50 / $7.50 after |
+| `qwen/qwen3.8-27b` (Groq) | $0.80 | $4.00  | https://console.groq.com/docs/models          |                                                     |
 
 ### 7.5 Human preference leaderboard
 
@@ -425,14 +426,32 @@ The stat is only meaningful because voters cannot see pass/fail, score, cost, or
 
 `arena record` is built to run over hours or days:
 
-- **Throttle.** A limiter per model holds requests/minute, requests/day, tokens/minute, and tokens/day from the pricing table. Gemini's limits are not published, so the owner copies them from the AI Studio rate-limit page into the table before recording.
+- **Throttle.** A limiter per model holds requests/minute, requests/day, tokens/minute, and tokens/day from the pricing table. Refused requests count too: on Groq a rejected call still uses the per-minute allowance.
+- **Outage tracking.** The recorder counts, per provider, the requests served, refused for rate limits, and refused for outages, and the retries they caused. The pilot reports these rates.
 - **Backoff.** On HTTP 429 the client waits for the `retry-after` header when present, otherwise exponential backoff with jitter, up to a retry cap.
 - **Daily quota.** When a model's daily quota is exhausted, the recorder finishes or abandons the current run, prints when to resume, and exits cleanly.
 - **Resume.** A `(config, task)` pair is done when a finished recorded run exists in the run store. Re-running the command skips those and continues. Abandoned runs are discarded.
 - **Pilot gate.** `arena record --pilot` runs 10 runs spread across configs and categories, then reports tokens per run, pass rate per task, time per run, and the projected number of days for all 120. It stops there; the rest starts only after the owner approves.
 - **Export.** `arena export` writes `data/recordings/`. It removes API keys, auth headers, and every value from `.env`, and refuses to write a record that still matches a key-like pattern. A test scans the folder and fails if any key-like pattern appears.
 
-**Rough expectation, to be replaced by the pilot's measurement.** At about 15,000 tokens per run, the two `gpt-oss-120b` configs need about 900,000 tokens for 60 runs, so about 5 days at 200,000 tokens/day. The Gemini side depends on the daily request limit shown in AI Studio.
+**Limits in force (2026-10-02).**
+
+| Model                     | Requests/min | Requests/day | Tokens/min             | Tokens/day | Source                                                     |
+| ------------------------- | ------------ | ------------ | ---------------------- | ---------- | ---------------------------------------------------------- |
+| `gemini-3.8-flash`        | 5            | 20           | 250,000                | not shown  | Owner's AI Studio rate-limit page                          |
+| `qwen/qwen3.8-27b` (Groq) | 30           | 1,000        | 7,000 input (enforced) | 200,000    | Groq docs; the per-minute figure is from the API's own 429 |
+
+**Rough expectation, to be replaced by the pilot's measurement.**
+
+- **Qwen on Groq:** about 4,000 tokens per run, so about 50 runs a day against 200,000 tokens a day. Sixty runs take two days.
+- **Gemini:** about three requests per run against 20 requests a day is six or seven runs a day. Sixty runs take about ten days, more if refused requests count against the daily limit. On the first day about 8 of 11 run attempts were refused with HTTP 503.
+
+**The Gemini figure is the weak point of the plan.** Options, for the owner to choose after the pilot:
+
+1. Accept roughly two weeks of unattended, resumable recording for the Gemini configs.
+2. Use a different free Gemini model with a higher daily limit, if the AI Studio page shows one. The pricing page lists `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-2.5-flash`, and `gemini-2.5-flash-lite` as free of charge; their limits are per project and only visible there.
+3. Replace the Gemini pair with a second Groq model. Each Groq model has its own daily allowance, and the prompt pair needs only one model.
+4. Record the Gemini configs on a subset of the task bank.
 
 ## 9. Hosting (all free)
 

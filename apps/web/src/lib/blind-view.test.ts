@@ -17,11 +17,11 @@ const secrets = [...identifyingStrings(leftRun), ...identifyingStrings(rightRun)
 
 const baseOptions = {
   runId: "01JRUNOTHER000000000000000",
-  configName: "oss-full",
-  displayName: "gpt-oss-120b, full prompt",
-  model: "groq/openai/gpt-oss-120b",
+  configName: "qwen-full",
+  displayName: "Qwen 3.8 27B, full prompt",
+  model: "groq/qwen/qwen3.8-27b",
   provider: "groq",
-  modelFamily: "gpt-oss",
+  modelFamily: "qwen",
   systemPrompt: "Solve the task.",
   passed: false,
 };

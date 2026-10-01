@@ -11,3 +11,4 @@ apps/web/AGENTS.md
 apps/web/src/components/ui/**
 apps/web/src/lib/api-types.ts
 configs/**
+docs/findings/**

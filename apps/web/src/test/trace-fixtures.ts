@@ -151,11 +151,11 @@ export const leftRun = recordedRun({
 
 export const rightRun = recordedRun({
   runId: "01JRUNRIGHT000000000000000",
-  configName: "oss-two-tools",
-  displayName: "gpt-oss-120b, two tools",
-  model: "groq/openai/gpt-oss-120b",
+  configName: "qwen-two-tools",
+  displayName: "Qwen 3.8 27B, two tools",
+  model: "groq/qwen/qwen3.8-27b",
   provider: "groq",
-  modelFamily: "gpt-oss",
+  modelFamily: "qwen",
   systemPrompt: "Answer the question.",
   passed: false,
   stopReason: "max_cost",

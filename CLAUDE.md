@@ -6,8 +6,9 @@ The project exists to show skill in agent evaluation and observability. Correct 
 
 - Design and phase plan: `docs/PLAN.md`
 - Why things are the way they are: `docs/DECISIONS.md`
+- What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current phase: 2 complete and exercised with real Gemini and Groq runs. An open decision on the Groq model (gpt-oss-120b cannot use `python_exec`) is with the owner. Next: 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`), then 3.** Update this line at the end of every phase.
+**Current phase: 2b (Claude subscription backend, `docs/CLAUDE_BACKEND.md`) in progress. Next: 3.** Update this line at the end of every phase.
 
 ## How we work
 
@@ -66,7 +67,7 @@ pnpm schema:gen                        # regenerate TS and Pydantic types from t
 pnpm schema:check                      # fail if generated types are stale
 node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 docker compose exec api uv run arena list
-docker compose exec api uv run arena run --config gemini-full --task dev-math-01
+docker compose exec api uv run arena run --config qwen-full --task dev-math-01
 ```
 
 Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `arena export` (Phase 4), `arena record --pilot` (Phase 8).

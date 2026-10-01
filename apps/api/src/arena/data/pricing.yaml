@@ -23,17 +23,18 @@ models:
       checked: 2026-10-02
       note: Promotional price through 2026-12-31; 1.50 / 7.50 from 2027-01-01.
     free_tier:
-      source: https://ai.google.dev/gemini-api/docs/rate-limits
+      source: https://aistudio.google.com/rate-limit
       checked: 2026-10-02
       note: >-
-        Free-tier limits are not published. The docs say they "can be viewed in
-        Google AI Studio" and apply per project. Copy them from the AI Studio
-        rate-limit page before recording; they are left empty until then.
-      requests_per_minute: null
-      requests_per_day: null
-      tokens_per_minute: null
+        Not published in the docs; read by the owner from the AI Studio rate-limit
+        page for their project. The page shows no daily token limit.
+      requests_per_minute: 5
+      requests_per_day: 20
+      tokens_per_minute: 250000
       tokens_per_day: null
 
+  # Not used by any config. Kept so the finding in docs/FINDINGS.md can be reproduced:
+  # this model calls its built-in `python` tool instead of python_exec.
   groq/openai/gpt-oss-120b:
     provider: groq
     billing: free
@@ -49,4 +50,24 @@ models:
       requests_per_minute: 30
       requests_per_day: 1000
       tokens_per_minute: 8000
+      tokens_per_day: 200000
+
+  groq/qwen/qwen3.8-27b:
+    provider: groq
+    billing: free
+    backends: [litellm]
+    reference:
+      input_per_mtok: 0.80
+      output_per_mtok: 4.00
+      source: https://console.groq.com/docs/models
+      checked: 2026-10-02
+    free_tier:
+      source: https://console.groq.com/docs/rate-limits
+      checked: 2026-10-02
+      note: >-
+        The page lists 8,000 tokens per minute. The API's own 429 on 2026-10-02 named
+        a limit of 7,000 input tokens per minute, so the enforced figure is used here.
+      requests_per_minute: 30
+      requests_per_day: 1000
+      tokens_per_minute: 7000
       tokens_per_day: 200000
