@@ -1,8 +1,8 @@
 # Agent Eval Arena: Plan
 
-Status: Phase 0, awaiting approval. Last updated 2026-10-01.
+Status: approved 2026-10-01. Phase 1 in progress.
 
-This plan turns the project brief into a buildable design. Where it departs from the brief, the departure is listed in [Section 11](#11-deviations-from-the-brief) and the reason is in `DECISIONS.md`. Five items still need a decision from you; they are in [Section 12](#12-open-questions).
+This plan turns the project brief into a buildable design. Where it departs from the brief, the departure is listed in [Section 11](#11-deviations-from-the-brief) and the reason is in `DECISIONS.md`. The questions raised in Phase 0 and their answers are in [Section 12](#12-resolved-questions).
 
 ## 1. What we're building
 
@@ -228,7 +228,7 @@ Fixed-window counters, incremented with a single atomic `INSERT … ON CONFLICT 
 
 Defined once in `packages/schema/trace-event.schema.json` (JSON Schema 2020-12, discriminated on `type`).
 
-Envelope: `run_id`, `side` (`left`, `right`, or null on run permalinks), `seq`, `type`, `timestamp`, `payload`.
+Envelope: `run_id`, `side` (`left`, `right`, or null on run permalinks), `seq`, `type`, `timestamp`, `redacted` (true when served in the blind view), `payload`.
 
 | Type | Payload |
 |---|---|
@@ -242,15 +242,28 @@ Envelope: `run_id`, `side` (`left`, `right`, or null on run permalinks), `seq`, 
 | `score_computed` | `passed`, `score`, `scorer_type`, `explanation` |
 | `error` | `message`, `recoverable` |
 
-`stop_reason` is one of `answered`, `max_steps`, `max_tokens`, `max_cost`, `timeout`, `error`. The brief lists four values but requires three budget limits, so the token and cost limits need their own values (open question 4).
+`stop_reason` is one of `answered`, `max_steps`, `max_tokens`, `max_cost`, `timeout`, `error`. The brief lists four values but requires three budget limits, so the token and cost limits have their own values.
 
 **Generation.** `json-schema-to-typescript` writes `packages/schema/generated/trace-event.ts`. `datamodel-code-generator` writes `apps/api/src/arena/schema_gen.py`. Both outputs are committed. `pnpm schema:check` regenerates and fails on any diff, and runs in lint.
 
-**Blind view.** Until the requesting voter has voted on a match, events served through that match are redacted on the server:
+### 4.1 Blind view
 
-- `run_id` is replaced by a match-scoped alias.
-- `run_started.config` is replaced by `{ "redacted": true }`.
-- `llm_call.model` is null, and any system message is removed from `input_preview`.
+Before the vote, a voter sees only what each agent did and what it answered: the traces and the final answers, with a counter strip showing step count and elapsed time. Pass/fail, score, cost, tokens, and config names are revealed together after the vote. If the result were visible first, voters would pick the side that passed and the agreement stat would be circular.
+
+Redaction happens on the server. Until the requesting voter has voted on a match, everything served for that match (the SSE stream and `GET /matches/{id}`) is filtered as follows, and each filtered event carries `redacted: true`:
+
+| Event | Before the vote |
+|---|---|
+| every event | `run_id` replaced by a match-scoped alias |
+| `run_started` | `config` is null |
+| `llm_call` | `model`, `prompt_tokens`, `completion_tokens`, `cost_usd` are null; system messages removed from `input_preview` |
+| `step_finished` | `total_tokens`, `cost_usd` are null |
+| `run_finished` | `cost_usd`, `total_tokens` are null; `stop_reason` is null when it is `max_tokens` or `max_cost` (the UI shows "stopped at a limit") |
+| `score_computed` | not sent at all |
+
+Still visible: step numbers, tool calls and results, model output, the final answer, per-call and total `latency_ms`, and `error` events.
+
+The schema marks every redactable field as nullable, so the blind view is valid against the same schema. After the vote, the API returns the full events, the scorecard, both configs, and the run ids.
 
 ## 5. API
 
@@ -266,9 +279,9 @@ Base path `/api`. Requests carry `X-Voter-Id` (an anonymous UUID the browser gen
 | `GET /configs/{id}` | | One config version |
 | `POST /configs` (admin) | `{family_id?, display_name, model, provider, model_family, system_prompt, enabled_tools, max_steps, temperature?}` | `201` new version |
 | `POST /matches` | `{task_id \| "random", left_config_id \| "random", right_config_id \| "random", mode}` | `{match_id, mode, task}`. Replay returns an existing match the voter has not voted on. Live returns `202` and starts both runs. |
-| `GET /matches/{id}` | | Task, per-side status and metrics, `voted`, and after the vote: both configs, run ids, tallies |
+| `GET /matches/{id}` | | Task, `voted`, and per side: status, step count, elapsed time, final answer. After the vote it adds pass/fail, score, cost, tokens, both configs, run ids, and tallies |
 | `GET /matches/{id}/events?voter=&speed=` | `Last-Event-ID` header | SSE stream, Section 6 |
-| `POST /matches/{id}/vote` | `{choice}` | `201 {reveal: {left, right}, tallies}`; `409` if already voted or match unfinished; `429` if rate limited |
+| `POST /matches/{id}/vote` | `{choice}` | `201 {reveal: {left, right}, scorecard, tallies}`; `409` if already voted or match unfinished; `429` if rate limited |
 | `GET /runs/{id}` | | Run, config, metrics, score |
 | `GET /runs/{id}/events?after=&limit=` | | Paginated events |
 | `GET /runs/{id}/events/{seq}/input` | | Full reconstructed model input for one `llm_call` |
@@ -304,8 +317,10 @@ sequenceDiagram
   A->>B: event: match_finished
   B->>A: POST /matches/{id}/vote
   A->>D: insert vote with pass/fail snapshot
-  A->>B: reveal configs and run ids
+  A->>B: reveal scorecard, configs, and run ids
 ```
+
+Events on the stream are served in the blind view (Section 4.1) until the voter has voted.
 
 - **Event id** is a cursor holding the last delivered `seq` for each side (`L12-R9`). On reconnect the browser sends it as `Last-Event-ID` and the server resumes from there.
 - **Ordering.** Within a side, `seq` is strictly increasing with no gaps. Across sides, events are interleaved by timestamp.
@@ -331,7 +346,9 @@ Each task is one YAML file under `tasks/<category>/`. Every task ships with a kn
 | `python_check` | Run a checker function from `tasks/checkers/` in the sandbox |
 | `llm_judge` | Rubric plus structured verdict; reasoning logged in `score_computed.explanation` |
 
-**Judge rule.** At startup and before any recording, the API checks that the judge's `model_family` differs from every contestant config's. If it does not, `llm_judge` tasks are excluded from recording and leaderboards. See open question 1: with contestants spread over two providers, the plan is a task bank with no `llm_judge` tasks.
+**Judge rule.** The judge's `model_family` must differ from every contestant config's, to avoid self-preference bias. The API checks this at startup and before any recording, and refuses to score an `llm_judge` task when the rule is broken.
+
+**The recorded bank has no `llm_judge` tasks.** All 30 tasks use deterministic scorers. `llm_judge` is implemented and tested (with the scripted fake client) so it is available for future tasks, but with contestants on two providers there is no eligible judge without a third.
 
 ### 7.3 Proposed configs
 
@@ -363,6 +380,19 @@ Computed over the recorded set, where every config has exactly one run per task,
 - **Full table:** every vote is stored with both sides' pass/fail, so the page and the README can also show how people vote when both passed or both failed.
 - **Position bias:** the share of non-tie votes that picked the left pane, as a check on the blind setup.
 
+The stat is only meaningful because voters cannot see pass/fail, score, cost, or tokens before they vote (Section 4.1).
+
+### 7.7 Methodology notes for `/about`
+
+The page must state, in plain terms:
+
+- **What voters see.** Before voting: both traces and final answers, step count, elapsed time. After voting: pass/fail, score, cost, tokens, and which config was on which side. The server withholds the rest, so it is not in the page source either.
+- **What is still not blind.** Elapsed time and the style of a trace can hint at which model is behind a pane. A visitor who votes from a second browser can unblind a match. Position bias is reported.
+- **Scoring.** Every recorded task uses a deterministic scorer. An LLM judge exists in the codebase but is not used for any recorded task; if it is ever used, the judge must come from a different model family than every contestant, to avoid self-preference bias.
+- **Elo.** K=32, start 1000, replayed over the vote log in order; online Elo depends on that order; intervals come from a seeded bootstrap.
+- **Agreement.** Defined on matches where exactly one side passed.
+- **Limits of the data.** One recorded run per config per task; model output is not deterministic, so replays are recordings and a re-run can differ; votes on a public demo can be manipulated.
+
 ## 8. Modes, cost, and abuse control
 
 | | Replay (default) | Live |
@@ -377,12 +407,13 @@ Computed over the recorded set, where every config has exactly one run per task,
 - **Recording script** (`arena record`): idempotent per `(config, task)`, resumable, with a global budget guard that stops before the cumulative spend would exceed the cap.
 - **Recording budget: $20 total, including the pilot.** The script first runs a 10-run pilot spread across configs and categories, reports measured cost per run per config and the projected total for all 120, and stops. The remaining runs start only after you approve.
 - **Export.** Recorded runs are exported to `data/recordings/*.jsonl` and committed, so the deployed database can be seeded and the README numbers can be reproduced without spending again.
+- **Scrubbing.** The exporter removes API keys, auth headers, and every value from `.env` before writing, and refuses to write a record that still matches a key-like pattern. A test scans `data/recordings/` and fails if any key-like pattern appears, so a leak cannot be committed unnoticed.
 
 ## 9. Phases and acceptance criteria
 
 Every phase ends with: files changed, tests run, a commit, a report (what was done, exact verification commands, decisions, open questions), then a stop.
 
-Backend commands run in Docker: `docker compose exec api uv run pytest`. Root scripts wrap them (`pnpm test:api`).
+Backend commands run in Docker. Root scripts wrap them (`pnpm test:api` runs pytest for the API and the sandbox in their containers).
 
 | Phase | Deliverable | Acceptance |
 |---|---|---|
@@ -390,11 +421,11 @@ Backend commands run in Docker: `docker compose exec api uv run pytest`. Root sc
 | 1 Scaffold | Monorepo, `web` + `api` + `sandbox` booting, compose file, lint/format/typecheck, health endpoint, schema generation, `.env.example`. Starts with a Next 16 install-and-build smoke test of shadcn/ui, React Flow, and TanStack Query. | `docker compose up` brings everything up; `pnpm lint`, `pnpm typecheck`, `pnpm test:api` pass; `pnpm schema:check` passes |
 | 2 Runner + tracing | LangGraph loop, four tools, sandbox service, event emitter, pricing table, `arena run` CLI | Unit tests per tool, including sandbox escape attempts (network, filesystem writes, fork bomb, memory bomb, infinite loop) and timeouts; every emitted event validates against the schema; a test per limit proving the right `stop_reason` |
 | 3 Tasks + scorers | 30 YAML tasks, fixtures, corpus, all scorers, `arena eval` CLI | Per task, a test that a known-correct answer passes and a known-wrong one fails |
-| 4 DB + API + streaming | Models, Alembic migrations, REST endpoints, SSE endpoint, DB-backed rate limiter | Integration test: start a match, consume the stream, both sides finish with gap-free `seq` and a stored score; reconnect test resumes from the cursor |
-| 5 Arena UI | `/arena` pickers, split-pane traces, counter strip, list view, scorecard | A full match runs in the browser against the local backend; component tests for the trace card and scorecard |
-| 6 Voting + reveal | Blind redaction, vote endpoint, reveal, rate limits | Tests for vote validation, double-vote rejection, rate limit persistence across a restart, and that no redacted field reaches an unvoted client |
+| 4 DB + API + streaming | Models, Alembic migrations, REST endpoints including a basic vote endpoint, SSE endpoint, blind-view redaction | Integration test: start a match, consume the stream, both sides finish with gap-free `seq` and a stored score; reconnect test resumes from the cursor; a test that no redacted field and no `score_computed` event reaches a client that has not voted |
+| 5 Arena UI | `/arena` pickers, split-pane traces, counter strip (steps and elapsed time only before the vote), list view, plain vote buttons, scorecard shown after the vote | A full match runs in the browser against the local backend; component tests for the trace card and scorecard |
+| 6 Voting + reveal | Reveal animation, vote validation, double-vote handling, DB-backed rate limits | Tests for vote validation, double-vote rejection, and rate limit persistence across a restart |
 | 7 Leaderboards | Elo, bootstrap intervals, objective table, agreement, category filters | Elo matches hand-computed examples; bootstrap is deterministic under a fixed seed; page renders with seeded data |
-| 8 Replay + cost safety | Replay streamer, recording script with pilot gate, mode switching, BYOK, budget caps | A visitor completes a match and votes while the model client is mocked and asserted never called; budget guard test |
+| 8 Replay + cost safety | Replay streamer, recording script with pilot gate, scrubbed export, mode switching, BYOK, budget caps | A visitor completes a match and votes while the model client is mocked and asserted never called; budget guard test; a test that fails if a key-like pattern appears in `data/recordings/` |
 | 9 Polish | Theme, graph view, permalinks, `/about`, empty/loading/error states, mobile layout, Open Graph images | Lighthouse ≥ 90 for performance and accessibility; Playwright end-to-end test passes |
 | 10 Results + launch | Pilot, then full recording after approval; README with measured results; deployment | Deployed app works end to end in replay mode |
 
@@ -402,7 +433,8 @@ Backend commands run in Docker: `docker compose exec api uv run pytest`. Root sc
 
 | Risk | Handling |
 |---|---|
-| Blind voting is weakened by visible metrics: cost and latency hint at which side is the stronger model | The brief puts the scorecard before the vote, so this stays. Names, models, and prompts are redacted; `/about` states the limitation; position bias is reported |
+| Blind voting leaks the result or the identity of a side | Pass/fail, score, cost, tokens, model, prompt, and config are withheld on the server until the vote (Section 4.1), with a test. Elapsed time and trace style can still hint at the model; `/about` says so and position bias is reported |
+| A secret ends up in committed recordings | Exporter scrubs and refuses key-like content; a test scans the recordings folder |
 | Provider quirks through LiteLLM: models that reject `temperature` or forced tool choice, reasoning blocks that must be returned unchanged | Nullable temperature, no forced tool choice, verbatim message store; a contract test per configured provider in Phase 2 |
 | Sandbox escape | Layered isolation (Section 2.2), no secrets in the sandbox, escape attempts in the test suite |
 | SQLite on a Windows bind mount (locking and WAL problems) | The database file lives in a Docker named volume; WAL mode and a busy timeout |
@@ -419,7 +451,7 @@ Backend commands run in Docker: `docker compose exec api uv run pytest`. Root sc
 
 ## 11. Deviations from the brief
 
-Already approved by you:
+All approved by the owner.
 
 1. Next.js 16 instead of 15.
 2. The Python backend runs in Docker; `uv` is not installed on the host.
@@ -433,19 +465,21 @@ Already approved by you:
 10. Conversation stored once per run instead of a full copy per `llm_call`.
 11. Reproducibility is claimed for tools, fixtures, and scorers, not for model output.
 
-Proposed in this plan, pending approval:
-
 12. `apps/sandbox` is added to the monorepo layout.
 13. `stop_reason` gains `max_tokens` and `max_cost`.
 14. `side` is added at serving time and is not stored on the event.
 15. The voter id is a browser-generated header value, not a cookie.
 16. Tailwind v4 keeps design tokens as CSS variables in one stylesheet (`@theme`), not in a `tailwind.config` file. The theme is still swappable in one place.
-17. Recorded runs are committed to the repo as JSONL.
+17. Recorded runs are committed to the repo as JSONL, scrubbed of secrets, with a test that scans for key-like patterns.
+18. The scorecard is shown after the vote, not before. Before the vote the UI shows traces, final answers, step count, and elapsed time only, and the server withholds everything else.
+19. The recorded task bank has no `llm_judge` tasks.
 
-## 12. Open questions
+## 12. Resolved questions
 
-1. **Judge model versus two-provider contestants.** You asked for contestants from two providers when both keys exist, and for a judge from no contestant's model family. With two providers both fielding contestants, no judge qualifies unless there is a third provider key. My recommendation: write all 30 tasks with deterministic scorers, implement and test `llm_judge` fully, and leave it out of the recorded bank unless you add a third key. The alternative is to keep all contestants on one provider and use the second for the judge.
-2. **`apps/sandbox`.** Approve the extra app in the layout?
-3. **More dependencies.** Beyond what you approved: `pydantic-settings`, `uvicorn`, `pytest-asyncio`, `jsonschema` (tests validate events against the schema file itself), `python-ulid`, and `numpy` + `pandas` in the sandbox image only (for the data analysis tasks). Optional: `openapi-typescript`, to generate REST response types from FastAPI's OpenAPI so those cannot drift either; without it the REST types are hand-written.
-4. **`stop_reason` values.** Approve `max_tokens` and `max_cost`, or should both map to `error`?
-5. **Committing recordings.** Approve committing `data/recordings/*.jsonl` (a few megabytes)?
+| Question | Answer |
+|---|---|
+| Judge model versus two-provider contestants | Deterministic scorers for all 30 recorded tasks. `llm_judge` is built and tested but kept out of the recorded bank. |
+| `apps/sandbox` in the layout | Approved. |
+| More dependencies | Approved: `pydantic-settings`, `uvicorn`, `pytest-asyncio`, `jsonschema`, `python-ulid`, `numpy` and `pandas` (sandbox image only), `openapi-typescript`. |
+| `stop_reason` values | `max_tokens` and `max_cost` added. |
+| Committing recordings | Approved, on condition that they are scrubbed and a test fails on any key-like pattern. |

@@ -23,3 +23,10 @@ One line per significant decision and why. Newest at the bottom.
 | 2026-10-01 | Conversation stored once per run (`run_messages`); `llm_call` references a position in it | A full input copy per call grows quadratically with steps. |
 | 2026-10-01 | Reproducibility is claimed for tools, fixtures, and scorers; replays are recordings | Model output is not deterministic. |
 | 2026-10-01 | Extra dependencies approved: `json-schema-to-typescript`, `datamodel-code-generator`, `typer`, `PyYAML`, `httpx`, `sse-starlette`, `rank-bm25`, async SQLite/Postgres drivers | Owner approved in Phase 0. |
+| 2026-10-01 | Scorecard, pass/fail, score, cost, tokens, and config names are revealed only after the vote; before it the UI shows traces, final answers, step count, and elapsed time, and the server redacts the rest from events | Showing the result first makes the agreement stat circular: voters would pick the side that passed. |
+| 2026-10-01 | All 30 recorded tasks use deterministic scorers; `llm_judge` is built and tested but not in the recorded bank | With contestants on two providers, no judge outside every contestant's model family is available. |
+| 2026-10-01 | `apps/sandbox` added to the layout | Sandbox needs its own image and dependencies. |
+| 2026-10-01 | `stop_reason` gains `max_tokens` and `max_cost` | The brief requires token and cost limits but had no values for them. |
+| 2026-10-01 | Recordings are committed as JSONL, scrubbed of API keys, auth headers, and `.env` values, with a test that fails on any key-like pattern in the folder | Owner's condition for committing them. |
+| 2026-10-01 | Extra dependencies approved: `pydantic-settings`, `uvicorn`, `pytest-asyncio`, `jsonschema`, `python-ulid`, `numpy` + `pandas` (sandbox only), `openapi-typescript` | Owner approved in Phase 0. |
+| 2026-10-01 | Voter id is a browser-generated header, not a cookie; `side` is added at serving time; streaming is per trace event; Tailwind v4 tokens live in one stylesheet | Approved as written in PLAN.md. |

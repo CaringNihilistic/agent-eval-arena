@@ -7,7 +7,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Design and phase plan: `docs/PLAN.md`
 - Why things are the way they are: `docs/DECISIONS.md`
 
-**Current phase: 0 (planning), awaiting approval of `docs/PLAN.md`.** Update this line at the end of every phase.
+**Current phase: 1 (scaffold), in progress.** Update this line at the end of every phase.
 
 ## How we work
 
@@ -22,10 +22,10 @@ The project exists to show skill in agent evaluation and observability. Correct 
 ```
 apps/web         Next.js 16 frontend
 apps/api         FastAPI backend, agent runner, scorers, `arena` CLI
-apps/sandbox     Isolated Python execution service (pending approval, PLAN open question 2)
+apps/sandbox     Isolated Python execution service (python_exec, python_check)
 packages/schema  Trace event JSON Schema; generates TS types and Pydantic models
 tasks/           Task bank (YAML), CSV fixtures, doc corpus, checker functions
-data/recordings  Exported recorded runs (pending approval, PLAN open question 5)
+data/recordings  Exported recorded runs (JSONL, scrubbed of secrets, committed)
 docs/            PLAN.md, ARCHITECTURE.md, DECISIONS.md
 ```
 
@@ -53,7 +53,7 @@ docker compose up                      # web, api, sandbox
 pnpm lint                              # eslint + prettier check + ruff + schema:check
 pnpm typecheck                         # tsc + mypy
 pnpm test:web                          # vitest
-pnpm test:api                          # docker compose exec api uv run pytest
+pnpm test:api                          # pytest for api and sandbox, in their containers
 pnpm test:e2e                          # playwright
 pnpm schema:gen                        # regenerate TS and Pydantic types from the JSON Schema
 pnpm schema:check                      # fail if generated types are stale
@@ -74,14 +74,16 @@ docker compose exec api uv run arena record --pilot
 ### Scoring and honesty
 
 - Prefer deterministic scorers. `llm_judge` only where unavoidable, with the judge's reasoning in `score_computed.explanation`.
-- The judge model must not share a model family with any contestant config.
+- The judge model must not share a model family with any contestant config. The recorded task bank uses deterministic scorers only.
 - Never send `scorer_config` (expected answers, checker code) to the browser.
 - No placeholder logic or fake data in production paths. If something is stubbed, mark it `TODO(phase-N)` and mention it in the phase report.
 - Results in the README are measured numbers from recorded runs, never illustrative ones.
 
 ### Blind voting
 
-- Until a voter has voted on a match, the server redacts config, model, system prompt, and run id from everything it serves for that match. Redaction happens on the server, never in the browser.
+- Before the vote the UI shows only the traces, the final answers, step count, and elapsed time. Pass/fail, score, cost, tokens, and config names are revealed together after the vote.
+- Until a voter has voted on a match, the server withholds config, model, system prompt, run id, token counts, cost, and the `score_computed` event from everything it serves for that match (PLAN Section 4.1). Redaction happens on the server, never in the browser.
+- Any new field that reveals the result, the cost, or the identity of a side must be added to the blind-view redaction and its test.
 - Every vote stores both sides' pass/fail state.
 
 ### Cost and safety
@@ -90,6 +92,7 @@ docker compose exec api uv run arena record --pilot
 - Never hardcode API keys. Use `.env`; keep `.env.example` committed and current.
 - Visitor-supplied keys are held in memory for the duration of a run and are never written to the database or logs.
 - No test may call a real model. Use the scripted fake client.
+- Recordings written to `data/recordings/` are scrubbed of API keys, auth headers, and `.env` values, and a test fails if a key-like pattern appears there.
 - Recording has a $20 total cap. Run the 10-run pilot, report cost per run and the projected total, and wait for approval before recording the rest.
 - Agent tools have no live web access. `python_exec` runs only in the sandbox container. Never mount the Docker socket.
 - Rate limit counters live in the database, not in memory.
