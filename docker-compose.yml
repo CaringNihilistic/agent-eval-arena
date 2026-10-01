@@ -70,18 +70,19 @@ services:
       timeout: 3s
       retries: 12
 
+  # Production-build check for the frontend. Not started by a plain
+  # `docker compose up`: daily development runs the web app on the host
+  # (`pnpm dev:local`). Start it with `pnpm web:prodcheck`.
   web:
+    profiles: ["web"]
     image: node:24-slim
     working_dir: /repo
-    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter web exec next dev --webpack --hostname 0.0.0.0 --port 3100"
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter web build && pnpm --filter web exec next start --hostname 0.0.0.0 --port 3100"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
-      # File change events do not cross the Windows bind mount. Turbopack does not
-      # pick up changes there, so the container runs the webpack dev server and polls.
-      WATCHPACK_POLLING: "true"
       npm_config_store_dir: /repo/.pnpm-store
     ports:
       - "${WEB_PORT:-3100}:3100"

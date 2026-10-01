@@ -45,13 +45,16 @@ docs/            PLAN.md, DECISIONS.md
 - The SQLite file lives in a Docker named volume, never on a Windows bind mount.
 - Ports: web on 3100 (3000 is used by another project on this machine), API on 8000. Both can be changed in `.env`.
 - The sandbox has no network and a read-only filesystem. After changing its dependencies, rebuild the image (`docker compose build sandbox`); `uv` cannot sync inside it.
-- The `web` container keeps its own `node_modules` in Docker volumes, separate from the host's. After changing web dependencies, restart it so it reinstalls.
-- Inside the `web` container the dev server uses webpack with polling, because Turbopack does not see edits across the Windows bind mount. For frontend work, `pnpm --filter web dev` on the host (Turbopack) is faster; stop the `web` container first, since both use port 3100.
+- Daily development runs the web app on the Windows host and only `api` and `sandbox` in Docker: `pnpm dev:local`. Host dev uses Turbopack and hot-reloads in about a second.
+- The `web` container is a production-build check only (`pnpm web:prodcheck`): it installs, runs `next build`, and serves with `next start`. It sits behind the compose profile `web`, so a plain `docker compose up` does not start it. It keeps its own `node_modules` and `.next` in Docker volumes, and it uses port 3100, so stop host dev first.
 
 ## Commands
 
 ```
-docker compose up                      # web (3100), api (8000), sandbox (internal only)
+pnpm dev:local                         # api + sandbox in Docker, web on the host (3100)
+pnpm dev:stop                          # stop and remove the containers
+pnpm web:prodcheck                     # production build of the web app in a container
+docker compose up                      # api (8000) and sandbox (internal only), no web
 pnpm lint                              # eslint + prettier check + ruff + schema:check
 pnpm typecheck                         # tsc + mypy (api and sandbox)
 pnpm test:web                          # vitest
@@ -59,7 +62,6 @@ pnpm test:api                          # pytest for api and sandbox, in their co
 pnpm format                            # prettier + ruff format
 pnpm schema:gen                        # regenerate TS and Pydantic types from the JSON Schema
 pnpm schema:check                      # fail if generated types are stale
-pnpm --filter web dev                  # frontend on the host, faster hot reload
 node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 ```
 
