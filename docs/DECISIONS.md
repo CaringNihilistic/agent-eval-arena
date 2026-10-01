@@ -1,0 +1,25 @@
+# Decisions log
+
+One line per significant decision and why. Newest at the bottom.
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-10-01 | Next.js 16 instead of 15 | Owner's choice. Registry peer ranges check out for Next 16.3.8 / React 19.2: `@xyflow/react` 12.12 (React ≥17), `@tanstack/react-query` 5.104 (React 18/19), `recharts` 3.10 (React 19). shadcn CLI 4.21 declares no peer ranges. Install-and-build smoke test still to run at the start of Phase 1; result to be logged here. |
+| 2026-10-01 | Monorepo at `C:\Frontend\agent-eval-arena`, local git commits per phase, no remote | Owner approved. |
+| 2026-10-01 | Backend and sandbox run in Docker; `uv` only inside containers; `pnpm` on the host via corepack | Windows host: memory limits, timeouts, and network isolation need Linux containers. WSL only if Docker fails, and only after telling the owner. |
+| 2026-10-01 | `python_exec` runs in a separate sandbox container on an internal-only network | The API container needs egress for model calls, so "no network" cannot be enforced on a subprocess inside it. Mounting the Docker socket was rejected: it gives the API root on the host and does not work on Railway or Fly. |
+| 2026-10-01 | Production is replay-first; live `python_exec` requires the sandbox service to be deployed | Keeps the public demo at zero API cost and avoids running untrusted code where isolation is not set up. |
+| 2026-10-01 | Model calls go through LiteLLM only; `@anthropic-ai/sdk` removed | Brief requires provider-swappable models. |
+| 2026-10-01 | LangGraph `StateGraph` nodes call LiteLLM directly | Avoids a LangChain chat-model adapter dependency. |
+| 2026-10-01 | `temperature` is nullable and omitted when null | Some current models reject the parameter. |
+| 2026-10-01 | A match references two runs; 120 recorded runs compose 180 replay matches | Recording every pairing fresh would cost 360 runs. |
+| 2026-10-01 | Judge model must be outside every contestant's model family; noted on `/about` | Avoids self-preference bias in `llm_judge`. |
+| 2026-10-01 | Recording cap $20 total; 10-run pilot with cost report, then stop for approval | Owner's budget control. |
+| 2026-10-01 | Rate limiter is hand-rolled with counters in the database | Must survive restarts and work across instances. |
+| 2026-10-01 | `both_bad` counts as a tie for Elo but is stored distinctly | Keeps Elo simple without losing the signal. |
+| 2026-10-01 | Every vote stores both sides' pass/fail | Agreement uses only one-side-passed matches, but the README results need the full table. |
+| 2026-10-01 | Blind view: server redacts config, model, system prompt, and run id until the voter has voted; sides randomised at match creation | The trace would otherwise reveal which config is which. |
+| 2026-10-01 | Match created by POST, stream consumed by a separate GET with a cursor in `Last-Event-ID` | `EventSource` is GET-only and cannot send headers, so it cannot carry a visitor's API key. |
+| 2026-10-01 | Conversation stored once per run (`run_messages`); `llm_call` references a position in it | A full input copy per call grows quadratically with steps. |
+| 2026-10-01 | Reproducibility is claimed for tools, fixtures, and scorers; replays are recordings | Model output is not deterministic. |
+| 2026-10-01 | Extra dependencies approved: `json-schema-to-typescript`, `datamodel-code-generator`, `typer`, `PyYAML`, `httpx`, `sse-starlette`, `rank-bm25`, async SQLite/Postgres drivers | Owner approved in Phase 0. |
