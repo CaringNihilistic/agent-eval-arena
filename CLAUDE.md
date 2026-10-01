@@ -7,7 +7,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Design and phase plan: `docs/PLAN.md`
 - Why things are the way they are: `docs/DECISIONS.md`
 
-**Current phase: 1 (scaffold), in progress.** Update this line at the end of every phase.
+**Current phase: 1 (scaffold) complete, awaiting go-ahead for Phase 2.** Update this line at the end of every phase.
 
 ## How we work
 
@@ -26,7 +26,7 @@ apps/sandbox     Isolated Python execution service (python_exec, python_check)
 packages/schema  Trace event JSON Schema; generates TS types and Pydantic models
 tasks/           Task bank (YAML), CSV fixtures, doc corpus, checker functions
 data/recordings  Exported recorded runs (JSONL, scrubbed of secrets, committed)
-docs/            PLAN.md, ARCHITECTURE.md, DECISIONS.md
+docs/            PLAN.md, DECISIONS.md
 ```
 
 ## Stack
@@ -40,27 +40,30 @@ docs/            PLAN.md, ARCHITECTURE.md, DECISIONS.md
 ## Environment
 
 - The host is Windows 11. The shell is PowerShell; Git Bash is available.
-- The Python backend and the sandbox run in Docker. `uv` is not installed on the host: run backend commands as `docker compose exec api uv run <cmd>`.
+- The Python backend and the sandbox run in Docker. `uv` is not installed on the host: run backend tools through `node scripts/py.mjs <api|sandbox> <cmd>`, which wraps `docker compose run --rm <service> uv run <cmd>`.
 - Docker Desktop must be running. If Docker causes problems, report it and ask before moving anything to WSL.
 - The SQLite file lives in a Docker named volume, never on a Windows bind mount.
+- Ports: web on 3100 (3000 is used by another project on this machine), API on 8000. Both can be changed in `.env`.
+- The sandbox has no network and a read-only filesystem. After changing its dependencies, rebuild the image (`docker compose build sandbox`); `uv` cannot sync inside it.
+- The `web` container keeps its own `node_modules` in Docker volumes, separate from the host's. After changing web dependencies, restart it so it reinstalls.
+- Hot reload inside the `web` container polls and is slow. For frontend work, run `pnpm --filter web dev` on the host against the API in Docker.
 
 ## Commands
 
-These are the planned commands; they exist from Phase 1 onward. Keep this section accurate as scripts are added.
-
 ```
-docker compose up                      # web, api, sandbox
+docker compose up                      # web (3100), api (8000), sandbox (internal only)
 pnpm lint                              # eslint + prettier check + ruff + schema:check
-pnpm typecheck                         # tsc + mypy
+pnpm typecheck                         # tsc + mypy (api and sandbox)
 pnpm test:web                          # vitest
 pnpm test:api                          # pytest for api and sandbox, in their containers
-pnpm test:e2e                          # playwright
+pnpm format                            # prettier + ruff format
 pnpm schema:gen                        # regenerate TS and Pydantic types from the JSON Schema
 pnpm schema:check                      # fail if generated types are stale
-docker compose exec api uv run arena run --config X --task Y
-docker compose exec api uv run arena eval --config X
-docker compose exec api uv run arena record --pilot
+pnpm --filter web dev                  # frontend on the host, faster hot reload
+node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 ```
+
+Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena run` (Phase 2), `arena eval` (Phase 3), `arena record --pilot` (Phase 8).
 
 ## Rules
 

@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-eval-arena.local/schema/trace-event.schema.json",
+  "title": "TraceEvent",
+  "description": "One structured event in an agent run. This file is the only definition of the trace format; TypeScript and Pydantic types are generated from it.",
+  "oneOf": [
+    { "$ref": "#/$defs/RunStartedEvent" },
+    { "$ref": "#/$defs/StepStartedEvent" },
+    { "$ref": "#/$defs/LlmCallEvent" },
+    { "$ref": "#/$defs/ToolCallEvent" },
+    { "$ref": "#/$defs/ToolResultEvent" },
+    { "$ref": "#/$defs/StepFinishedEvent" },
+    { "$ref": "#/$defs/RunFinishedEvent" },
+    { "$ref": "#/$defs/ScoreComputedEvent" },
+    { "$ref": "#/$defs/ErrorEvent" }
+  ],
+  "discriminator": { "propertyName": "type" },
+  "$defs": {
+    "Side": {
+      "title": "Side",
+      "description": "Which pane of a match the event belongs to. Null when a run is served outside a match.",
+      "oneOf": [{ "type": "string", "enum": ["left", "right"] }, { "type": "null" }]
+    },
+    "ToolName": {
+      "title": "ToolName",
+      "description": "Tools a config can enable.",
+      "type": "string",
+      "enum": ["calculator", "python_exec", "search_docs", "read_file"]
+    },
+    "StopReason": {
+      "title": "StopReason",
+      "type": "string",
+      "enum": ["answered", "max_steps", "max_tokens", "max_cost", "timeout", "error"]
+    },
+    "ScorerType": {
+      "title": "ScorerType",
+      "type": "string",
+      "enum": ["exact", "numeric_tolerance", "regex", "python_check", "llm_judge"]
+    },
+    "MessageRole": {
+      "title": "MessageRole",
+      "type": "string",
+      "enum": ["system", "user", "assistant", "tool"]
+    },
+    "ConfigSnapshot": {
+      "title": "ConfigSnapshot",
+      "description": "The config a run executed with, copied at run start.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family_id",
+        "version",
+        "display_name",
+        "model",
+        "provider",
+        "model_family",
+        "system_prompt",
+        "enabled_tools",
+        "max_steps",
+        "temperature"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "family_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 },
+        "display_name": { "type": "string" },
+        "model": { "type": "string" },
+        "provider": { "type": "string" },
+        "model_family": { "type": "string" },
+        "system_prompt": { "type": "string" },
+        "enabled_tools": { "type": "array", "items": { "$ref": "#/$defs/ToolName" } },
+        "max_steps": { "type": "integer", "minimum": 1 },
+        "temperature": {
+          "description": "Null means the parameter is omitted from model requests.",
+          "type": ["number", "null"]
+        }
+      }
+    },
+    "MessagePreview": {
+      "title": "MessagePreview",
+      "description": "A message shown in the trace, truncated for display. The full message is stored separately.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content", "truncated"],
+      "properties": {
+        "role": { "$ref": "#/$defs/MessageRole" },
+        "content": { "type": "string" },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "ToolInvocation": {
+      "title": "ToolInvocation",
+      "description": "A tool call requested by the model.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call_id", "tool", "arguments"],
+      "properties": {
+        "call_id": { "type": "string" },
+        "tool": {
+          "description": "Name as the model wrote it. Not restricted to ToolName: it can be the submit_answer control tool or a name that does not exist.",
+          "type": "string"
+        },
+        "arguments": { "type": "object" }
+      }
+    },
+    "LlmOutput": {
+      "title": "LlmOutput",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content", "tool_calls", "truncated"],
+      "properties": {
+        "content": { "type": ["string", "null"] },
+        "tool_calls": { "type": "array", "items": { "$ref": "#/$defs/ToolInvocation" } },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "RunStartedPayload": {
+      "title": "RunStartedPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config", "task_id"],
+      "properties": {
+        "config": {
+          "description": "Null in the blind view.",
+          "oneOf": [{ "$ref": "#/$defs/ConfigSnapshot" }, { "type": "null" }]
+        },
+        "task_id": { "type": "string" }
+      }
+    },
+    "StepStartedPayload": {
+      "title": "StepStartedPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step"],
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "LlmCallPayload": {
+      "title": "LlmCallPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step",
+        "model",
+        "input_upto",
+        "input_preview",
+        "output",
+        "prompt_tokens",
+        "completion_tokens",
+        "cost_usd",
+        "latency_ms"
+      ],
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "model": { "description": "Null in the blind view.", "type": ["string", "null"] },
+        "input_upto": {
+          "description": "The model saw conversation messages 0 up to, not including, this index.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_preview": {
+          "description": "Messages added to the conversation since the previous model call.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/MessagePreview" }
+        },
+        "output": { "$ref": "#/$defs/LlmOutput" },
+        "prompt_tokens": {
+          "description": "Null in the blind view.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "completion_tokens": {
+          "description": "Null in the blind view.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "cost_usd": {
+          "description": "Null in the blind view.",
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ToolCallPayload": {
+      "title": "ToolCallPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "call_id", "tool", "arguments"],
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "call_id": { "type": "string" },
+        "tool": { "type": "string" },
+        "arguments": { "type": "object" }
+      }
+    },
+    "ToolResultPayload": {
+      "title": "ToolResultPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step",
+        "call_id",
+        "tool",
+        "output",
+        "truncated",
+        "success",
+        "latency_ms",
+        "error"
+      ],
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "call_id": { "type": "string" },
+        "tool": { "type": "string" },
+        "output": { "description": "Truncated for display.", "type": "string" },
+        "truncated": { "type": "boolean" },
+        "success": { "type": "boolean" },
+        "latency_ms": { "type": "integer", "minimum": 0 },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "StepFinishedPayload": {
+      "title": "StepFinishedPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "total_tokens", "cost_usd"],
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "total_tokens": {
+          "description": "Cumulative for the run. Null in the blind view.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "cost_usd": {
+          "description": "Cumulative for the run. Null in the blind view.",
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "RunFinishedPayload": {
+      "title": "RunFinishedPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "final_answer",
+        "cost_usd",
+        "total_tokens",
+        "steps",
+        "latency_ms",
+        "stop_reason"
+      ],
+      "properties": {
+        "final_answer": { "type": ["string", "null"] },
+        "cost_usd": {
+          "description": "Null in the blind view.",
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "total_tokens": {
+          "description": "Null in the blind view.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "steps": { "type": "integer", "minimum": 0 },
+        "latency_ms": { "type": "integer", "minimum": 0 },
+        "stop_reason": {
+          "description": "Null in the blind view when the run stopped at a token or cost limit.",
+          "oneOf": [{ "$ref": "#/$defs/StopReason" }, { "type": "null" }]
+        }
+      }
+    },
+    "ScoreComputedPayload": {
+      "title": "ScoreComputedPayload",
+      "description": "Never sent in the blind view.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "score", "scorer_type", "explanation"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "scorer_type": { "$ref": "#/$defs/ScorerType" },
+        "explanation": { "type": "string" }
+      }
+    },
+    "ErrorPayload": {
+      "title": "ErrorPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "recoverable", "step"],
+      "properties": {
+        "message": { "type": "string" },
+        "recoverable": { "type": "boolean" },
+        "step": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "RunStartedEvent": {
+      "title": "RunStartedEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "run_started" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/RunStartedPayload" }
+      }
+    },
+    "StepStartedEvent": {
+      "title": "StepStartedEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "step_started" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/StepStartedPayload" }
+      }
+    },
+    "LlmCallEvent": {
+      "title": "LlmCallEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "llm_call" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/LlmCallPayload" }
+      }
+    },
+    "ToolCallEvent": {
+      "title": "ToolCallEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "tool_call" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/ToolCallPayload" }
+      }
+    },
+    "ToolResultEvent": {
+      "title": "ToolResultEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "tool_result" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/ToolResultPayload" }
+      }
+    },
+    "StepFinishedEvent": {
+      "title": "StepFinishedEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "step_finished" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/StepFinishedPayload" }
+      }
+    },
+    "RunFinishedEvent": {
+      "title": "RunFinishedEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "run_finished" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/RunFinishedPayload" }
+      }
+    },
+    "ScoreComputedEvent": {
+      "title": "ScoreComputedEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "score_computed" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/ScoreComputedPayload" }
+      }
+    },
+    "ErrorEvent": {
+      "title": "ErrorEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "side", "seq", "type", "timestamp", "redacted", "payload"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "side": { "$ref": "#/$defs/Side" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "const": "error" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "redacted": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/ErrorPayload" }
+      }
+    }
+  }
+}

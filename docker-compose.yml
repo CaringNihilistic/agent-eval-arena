@@ -1,0 +1,108 @@
+name: agent-eval-arena
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: uvicorn arena.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src
+    working_dir: /repo/apps/api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ARENA_SANDBOX_URL: http://sandbox:8001
+      ARENA_CORS_ORIGINS: '["http://localhost:${WEB_PORT:-3100}"]'
+      # File change events do not cross the Windows bind mount, so reload by polling.
+      WATCHFILES_FORCE_POLLING: "true"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - .:/repo
+    networks:
+      - default
+      - sandbox_net
+    depends_on:
+      sandbox:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Runs untrusted code for python_exec and python_check. It holds no secrets,
+  # has no route to the internet, and is reachable only from the api service.
+  sandbox:
+    build:
+      context: .
+      dockerfile: apps/sandbox/Dockerfile
+    networks:
+      - sandbox_net
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 128
+    cpus: 1.0
+    volumes:
+      - ./apps/sandbox:/repo/apps/sandbox:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://127.0.0.1:8001/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  web:
+    image: node:24-slim
+    working_dir: /repo
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter web exec next dev --hostname 0.0.0.0 --port 3100"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_DEV_POLL: "1"
+      npm_config_store_dir: /repo/.pnpm-store
+    ports:
+      - "${WEB_PORT:-3100}:3100"
+    volumes:
+      - .:/repo
+      # node_modules holds platform-specific binaries, so the container keeps its
+      # own copies in volumes and never shares them with the Windows host.
+      - web_root_modules:/repo/node_modules
+      - web_app_modules:/repo/apps/web/node_modules
+      - web_schema_modules:/repo/packages/schema/node_modules
+      - web_next:/repo/apps/web/.next
+      - web_pnpm_store:/repo/.pnpm-store
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  sandbox_net:
+    internal: true
+
+volumes:
+  web_root_modules:
+  web_app_modules:
+  web_schema_modules:
+  web_next:
+  web_pnpm_store:

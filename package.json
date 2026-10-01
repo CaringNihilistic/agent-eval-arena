@@ -1,0 +1,23 @@
+{
+  "name": "agent-eval-arena",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.8.1",
+  "scripts": {
+    "dev": "docker compose up",
+    "lint": "pnpm lint:web && pnpm format:check && pnpm lint:py && pnpm schema:check",
+    "lint:web": "pnpm --filter web lint",
+    "lint:py": "node scripts/py.mjs api ruff check . && node scripts/py.mjs api ruff format --check . && node scripts/py.mjs sandbox ruff check . && node scripts/py.mjs sandbox ruff format --check .",
+    "format": "prettier --write . && node scripts/py.mjs api ruff format . && node scripts/py.mjs sandbox ruff format .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm --filter web typecheck && node scripts/py.mjs api mypy && node scripts/py.mjs sandbox mypy",
+    "test": "pnpm test:web && pnpm test:api",
+    "test:web": "pnpm --filter web test",
+    "test:api": "node scripts/py.mjs api pytest && node scripts/py.mjs sandbox pytest",
+    "schema:gen": "pnpm --filter @arena/schema gen && node scripts/py.mjs api python scripts/gen_schema.py",
+    "schema:check": "pnpm --filter @arena/schema check && node scripts/py.mjs api python scripts/gen_schema.py --check"
+  },
+  "devDependencies": {
+    "prettier": "^3"
+  }
+}

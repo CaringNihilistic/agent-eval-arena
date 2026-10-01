@@ -1,0 +1,12 @@
+pnpm-lock.yaml
+**/generated/**
+**/.next/**
+**/node_modules/**
+**/next-env.d.ts
+apps/api/**
+apps/sandbox/**
+data/recordings/**
+tasks/**
+apps/web/AGENTS.md
+apps/web/src/components/ui/**
+apps/web/src/lib/api-types.ts

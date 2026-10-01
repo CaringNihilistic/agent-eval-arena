@@ -1,0 +1,17 @@
+{
+  "name": "@arena/schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./generated/trace-event.ts",
+    "./trace-event.schema.json": "./trace-event.schema.json"
+  },
+  "scripts": {
+    "gen": "node scripts/generate.mjs",
+    "check": "node scripts/generate.mjs --check"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15"
+  }
+}
