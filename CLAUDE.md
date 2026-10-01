@@ -46,7 +46,7 @@ docs/            PLAN.md, DECISIONS.md
 - Ports: web on 3100 (3000 is used by another project on this machine), API on 8000. Both can be changed in `.env`.
 - The sandbox has no network and a read-only filesystem. After changing its dependencies, rebuild the image (`docker compose build sandbox`); `uv` cannot sync inside it.
 - The `web` container keeps its own `node_modules` in Docker volumes, separate from the host's. After changing web dependencies, restart it so it reinstalls.
-- Hot reload inside the `web` container polls and is slow. For frontend work, run `pnpm --filter web dev` on the host against the API in Docker.
+- Inside the `web` container the dev server uses webpack with polling, because Turbopack does not see edits across the Windows bind mount. For frontend work, `pnpm --filter web dev` on the host (Turbopack) is faster; stop the `web` container first, since both use port 3100.
 
 ## Commands
 

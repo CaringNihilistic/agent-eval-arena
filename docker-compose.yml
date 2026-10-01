@@ -73,13 +73,15 @@ services:
   web:
     image: node:24-slim
     working_dir: /repo
-    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter web exec next dev --hostname 0.0.0.0 --port 3100"
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter web exec next dev --webpack --hostname 0.0.0.0 --port 3100"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
-      NEXT_DEV_POLL: "1"
+      # File change events do not cross the Windows bind mount. Turbopack does not
+      # pick up changes there, so the container runs the webpack dev server and polls.
+      WATCHPACK_POLLING: "true"
       npm_config_store_dir: /repo/.pnpm-store
     ports:
       - "${WEB_PORT:-3100}:3100"
