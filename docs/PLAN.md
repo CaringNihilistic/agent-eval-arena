@@ -1,6 +1,6 @@
 # Agent Eval Arena: Plan
 
-Status: revised 2026-10-02. Checkpoint B is complete: all 90 runs are recorded and the replay site works locally. **Section 0 is the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
+Status: revised 2026-10-03. Checkpoint B is complete; Checkpoint B2 (the Poison Pen game, Section 0.1) is in progress. **Sections 0 and 0.1 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
 
 Where this plan departs from the brief, the departure is listed in [Section 12](#12-deviations-from-the-brief) and the reason is in `DECISIONS.md`.
 
@@ -27,6 +27,100 @@ Where this plan departs from the brief, the departure is listed in [Section 12](
 **Rendering model output.** Final answers render as markdown with `react-markdown` and `remark-gfm`, with no raw-HTML plugin, so HTML in an answer is shown as text. Diagram answers are drawn with Mermaid at `securityLevel: "strict"`; if drawing fails the source is shown as text. A test feeds a `<script>` tag, an `onerror` attribute, and a `javascript:` link through both.
 
 **Not built yet.** Live mode and the Python run API (dropped unless the owner wants them back), the React Flow graph view, run permalinks, the Playwright end-to-end test, Open Graph images, the theme, the README results section, and deployment.
+
+## 0.1 Checkpoint B2: "Poison Pen: A Wrenfield Hall Mystery"
+
+Requested by the owner on 2026-10-03. The replay site becomes a game with a 1930s country-house theme. This section is the design; where it disagrees with Section 0 on the site's pages, routes, or vote storage, this section wins. The recordings, the scorers, the three configs, and the official-benchmarks data are unchanged.
+
+**The fiction.** Every evening an unsigned letter appears at dinner at Wrenfield Hall. Each recorded answer is a letter. Six guests sit at the table, but only three authors exist underneath: Haiku 4.5, Sonnet 5.5, and Opus 5.5. The player decides which letters to trust and unmasks the author. No real author's name, detective, or book title appears anywhere; `/about` says "inspired by golden-age detective fiction".
+
+### What existed before this checkpoint
+
+| From the spec                                                              | State before B2                                                                           |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Two-letter blind vote (The Drawing Room)                                   | Built, as the `/arena` match page with four choices. No guests, confidence, or accusation |
+| Server-side redaction of model, cost, tokens, timing, thinking; leak tests | Built, for two-letter matches only                                                        |
+| Vote fields: both sides' pass state, answer lengths, task, category        | Built. No mode, guest, confidence, or trap flag                                           |
+| Elo, position bias, length bias, agreement, official-benchmarks panel      | Built                                                                                     |
+| Second run of each model on each task (for traps)                          | Not recorded                                                                              |
+| Library, Weekend, Timetable, Morning Post, impostor traps, accusations     | Not built                                                                                 |
+| Guests, portraits, theme, XP, ranks, distinctions, Casebook, challenges    | Not built                                                                                 |
+| Playwright test                                                            | Not built                                                                                 |
+
+### Fairness rules (these outrank everything else in this section)
+
+- **Seats are costumes, not models.** The guest shown beside a letter comes from a hash of the round (and, in free-play modes, the voter), never from the run or its model. The function that assigns guests does not receive the model.
+- **Hidden before the decision:** model and config names, the system prompt, run ids, cost, tokens, all timing, thinking blocks, word counts, the scorer's result, and the guest's expression (the server sends none; the page shows neutral). One redaction function serves every mode, and the leak tests run over every mode's rounds built from the real recordings.
+- **Stored with every decision:** mode, round kind, the guest and position of every letter, the run behind each, confidence, the trap flag, answer lengths, and pass state.
+- **Points only for answers that can be right or wrong:** naming the author, calling the timetable, accusing (or not) correctly. A preference earns no points, and nothing is awarded for agreeing with other players. The share of players who trusted the same letter is shown after the decision, as information.
+- **Elo uses only preferences from The Drawing Room and The Library Gathering, never a trap round**, and never a preference from the Weekend or the Morning Post.
+- **Costume bias and position bias** are reported on the leaderboard once there are at least 30 two-letter preference votes: for each guest, how often the letter in that seat was trusted, against the 50% expected if costumes do not matter.
+
+### Second runs (trap material)
+
+A second run of every model on every task is recorded with `arena record --take 2`: 90 more runs, same settings, on the subscription, Haiku first, resumable. They are stored as `runs/<config>__<task>__2.jsonl` with `take: 2` in the header. A trap round shows a model's first and second run on one task in two seats. Leaderboard totals ("our 30-task totals") stay on first runs, so the published numbers do not change.
+
+### Rounds
+
+A round has a kind, and each mode is a way of dealing rounds.
+
+| Kind        | Shows                                           | Asks                                                                                                                  | Right answer?                                                                                                                                                 |
+| ----------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duel`      | Two letters on one task                         | "Trust letter A", "Equally good", "Neither", "Trust letter B", or "Accuse: one author, two seats"                     | Only the accusation: right when the round is a trap (+50), wrong otherwise (−30). Trusting a letter in a trap round scores nothing and counts as being fooled |
+| `ranking`   | All three authors' letters on one task          | Rank 1-2-3, or accuse                                                                                                 | The ranking has none. An accusation here is always wrong, since all three authors are present; the button is still shown, as specified                        |
+| `author`    | One letter                                      | Which of the three authors wrote it                                                                                   | Yes (+100)                                                                                                                                                    |
+| `timetable` | One run's trace, paused before the final answer | "It holds" or "It falls apart": will it pass the hidden tests (code, agent) or meet all the stated rules (open-ended) | Yes (+40)                                                                                                                                                     |
+
+Confidence ("A hunch", "Fairly sure", "Certain") is chosen before every submission and stored. It does not change points; the Casebook reports how often the player was right at each level.
+
+| Mode                     | Rounds                                                                                                                                                                                                                                                                        | Counts toward Elo |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| The Drawing Room         | One `duel` at a time, on a pairing the player has not judged. About 1 in 8 is a trap                                                                                                                                                                                          | Yes, except traps |
+| The Library Gathering    | One `ranking` at a time, on a task the player has not ranked. Each ranking becomes three pairwise results, tagged by mode                                                                                                                                                     | Yes               |
+| Does the Timetable Hold? | One `timetable` at a time                                                                                                                                                                                                                                                     | No                |
+| A Weekend at Wrenfield   | Ten seeded rounds: author, author, duel, timetable, author, duel, timetable, author, duel, timetable. Three candles; a wrong author, a wrong timetable call, a false accusation, or trusting a letter in a trap round blows one out, and the game ends when all three are out | No                |
+| The Morning Post         | Five rounds, the same for everyone on a given UTC date: author, timetable, duel, author, timetable. The result is shared as squares, for example `Poison Pen · Morning Post No. 14 ■■□■■`                                                                                     | No                |
+
+- **Difficulty in the Weekend.** Rounds 1 to 4 use clear differences; rounds 5 to 10 use close matches and traps. A pair is _close_ when the two runs have the same score and their lengths are within 25% of the longer; otherwise _clear_. For an author round, the letter is _clear_ when its run differs in that way from both other models' runs on the task. The first duel is never a trap; each of the other two is a trap with probability 5/8, which makes about 1 round in 8 a trap.
+- **Timetable rounds need something to watch.** Only runs that used a tool before answering are eligible, because a run that answers in one step shows nothing before its final answer. That is 27 of the first 90 runs (17 of them Haiku), and 21 of the 27 hold. Flagged to the owner: the pool is small, leans to one model, and "It holds" is right about three times in four.
+- **In a duel inside the Morning Post**, the square is filled when the player accused a trap or did not accuse a non-trap.
+
+### Seeds and round ids
+
+Every round has an id the server can rebuild the round from, and which does not name its runs: `dr.<hash>`, `lib.<hash>`, `tt.<hash>` for free play (a hash of the content), `wk.<seed>.<n>` for a Weekend, `mp.<day>.<n>` for the Morning Post. Seeded rounds are generated by one seeded generator, so the same seed gives the same ten rounds, guests, and seat order to everyone; that is what a challenge link relies on. In free play, guests and seat order also depend on the voter, so they vary between players. One decision per voter per round id.
+
+### Reveal: "The Gathering in the Library"
+
+After a decision the server returns: each guest's expression (trusted → happy, the other → shocked, a caught impostor → flustered), which model wrote each letter, that round's figures (rules met or pass/fail, words, cost at API rates), the model's 30-task totals, "X% of sleuths trusted the same letter" when at least five players have judged that pairing (otherwise "You're among the first to dine here."), the official-benchmarks panel, the points gained, and any distinction unlocked. A trap is announced as "One author, two seats!".
+
+### Progression (computed from the decision log; nothing is stored about a player but their decisions)
+
+- **Ranks by points:** Guest (0), Amateur Sleuth (200), Private Inquiry Agent (600), Celebrated Detective (1,500).
+- **Distinctions:** Spotted the Impostor (one correct accusation); An Ear for Haiku (named Haiku correctly three times); Expensive Taste (trusted Opus in every one of at least five non-trap preference rounds that included it); Thoroughly Fooled (trusted a letter in two trap rounds); Master of the Library (ranked ten Library Gatherings); Survived the Weekend (finished ten Weekend rounds with a candle still lit).
+- **My Casebook**, after ten decisions: a method name from the player's own votes (for example "The Plain Speaker" for mostly trusting the shorter letter), the author and the guest most trusted, author-naming accuracy, impostors caught, agreement with other players and with the official benchmark order, accuracy by confidence, and the latest Morning Post grid. A share link (a random id, not the browser id) and a copy-text button.
+- **Challenge a friend:** a link to the same seeded Weekend. When the friend finishes, both scores are shown with a "taste compatibility" figure: the share of rounds both played on which they gave the same answer.
+- Anonymous browser id only. No accounts.
+
+### Pages and routes
+
+Pages: the Lobby (`/`), The Guest List (`/guests`), `/drawing-room`, `/library`, `/weekend`, `/timetable`, `/morning-post`, `/challenge/[id]`, The Official Record (`/record`), `/casebook` and `/casebook/[share]`, `/about`. The old `/arena/[id]` and `/leaderboard` pages are removed.
+
+| Method and path                                         | Purpose                                                                             |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `POST /api/rounds/next`                                 | The next round for a mode (and game), blind, with the game's state                  |
+| `GET /api/rounds/{id}`                                  | A round: blind, or the reveal if this player has decided it                         |
+| `POST /api/rounds/{id}/decide`                          | Record an answer with its confidence; returns the reveal                            |
+| `GET /api/profile`                                      | Points, rank, distinctions, Casebook                                                |
+| `POST /api/casebook/share`, `GET /api/casebook/{share}` | Make and read a share link                                                          |
+| `POST /api/challenges`, `GET /api/challenges/{id}`      | Make a challenge from a finished Weekend; read both results                         |
+| `GET /api/leaderboard?category=`                        | The Official Record                                                                 |
+| `GET /api/art`                                          | Which portrait files exist, so dropped-in PNGs replace the SVGs with no code change |
+
+Postgres: `decisions` replaces `votes` (one row per voter per round, with the fields listed under the fairness rules), plus `shares` and `challenges`. Match building moves from the Python index builder to TypeScript round generation; `matches.json` is no longer written.
+
+### Theme
+
+All colours, fonts, and ornament values are design tokens in `globals.css`; components use only the tokens. Claret background with faint pinstripes, parchment letters and cards with double-line inset borders, sage primary buttons, rose ornament lines, burgundy stamps. Fonts: Limelight for titles, Libre Baskerville for body and letters (letters in italic), Josefin Sans 600 uppercase for labels. A test computes the contrast of every text and background token pair in use and fails below WCAG AA. Portraits are simple original SVGs, four expressions per guest, generated by a script and stored under `public/guests/<id>/`.
 
 ## 1. What we're building
 
