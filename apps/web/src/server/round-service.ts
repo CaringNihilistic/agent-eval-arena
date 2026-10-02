@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 
 import type { TraceEvent } from "@arena/schema";
 
-import { blindView, pausedView, seatAlias, summarizeBlindSide } from "@/lib/blind-view";
+import { blindView, seatAlias, summarizeBlindSide } from "@/lib/blind-view";
 import {
   buildCasebook,
   compatibility,
@@ -183,8 +183,7 @@ function gameState(
 function blindRound(recordings: Recordings, plan: RoundPlan, game: GameState | null): BlindRound {
   const letters: BlindLetter[] = plan.seats.map((seat) => {
     const alias = seatAlias(plan.id, seat.seat);
-    const stored = recordings.events(seat.run_id);
-    const events = plan.kind === "timetable" ? pausedView(stored, alias) : blindView(stored, alias);
+    const events = blindView(recordings.events(seat.run_id), alias);
     const summary = summarizeBlindSide(events);
     return {
       seat: seat.seat,

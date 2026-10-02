@@ -146,41 +146,6 @@ export function blindView(events: readonly TraceEvent[], alias: string): TraceEv
     .map((event) => ({ ...event, payload: withoutWorkingFolder(event.payload) }) as TraceEvent);
 }
 
-/**
- * The blind view of a run paused before its final answer, for a timetable
- * round. On top of the usual redaction, the answer is removed from the three
- * places it appears: the final model reply, the argument of the submit call,
- * and the run's last event.
- */
-export function pausedView(events: readonly TraceEvent[], alias: string): TraceEvent[] {
-  const blind = blindView(events, alias);
-  const lastCall = blind.findLastIndex((event) => event.type === "llm_call");
-  return blind.map((event, index): TraceEvent => {
-    if (event.type === "llm_call" && index === lastCall) {
-      return {
-        ...event,
-        payload: {
-          ...event.payload,
-          output: {
-            ...event.payload.output,
-            content: null,
-            tool_calls: event.payload.output.tool_calls.map((call) =>
-              call.tool === SUBMIT_ANSWER ? { ...call, arguments: {} } : call,
-            ),
-          },
-        },
-      };
-    }
-    if (event.type === "tool_call" && event.payload.tool === SUBMIT_ANSWER) {
-      return { ...event, payload: { ...event.payload, arguments: {} } };
-    }
-    if (event.type === "run_finished") {
-      return { ...event, payload: { ...event.payload, final_answer: null } };
-    }
-    return event;
-  });
-}
-
 export interface BlindSideSummary {
   finished: boolean;
   steps: number;
@@ -203,9 +168,4 @@ export function summarizeBlindSide(events: readonly TraceEvent[]): BlindSideSumm
     }
   }
   return { finished: false, steps, final_answer: null };
-}
-
-/** Did the run do anything a player can watch before its answer: a tool call that is not the submission. */
-export function hasVisibleWork(events: readonly TraceEvent[]): boolean {
-  return events.some((event) => event.type === "tool_call" && event.payload.tool !== SUBMIT_ANSWER);
 }

@@ -8,15 +8,19 @@ filesystem, no capabilities, a non-root user.
 import asyncio
 import os
 import textwrap
+import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from sandbox.executor import (
     WORK_ROOT,
     ExecLimits,
     ExecResult,
+    MermaidUnavailableError,
     execute,
+    is_injected,
     parse_mermaid,
     stray_processes,
 )
@@ -292,3 +296,61 @@ def test_mermaid_endpoint() -> None:
     assert good.json() == {"valid": True, "error": None}
     assert bad.json()["valid"] is False
     assert client.post("/mermaid/parse", json={"code": ""}).status_code == 422
+
+
+def test_a_parser_that_gives_no_verdict_is_a_failure_not_an_invalid_diagram(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A timeout far shorter than Node takes to start.
+    monkeypatch.setattr("sandbox.executor.MERMAID_TIMEOUT_S", 0.01)
+    client = TestClient(app)
+
+    with pytest.raises(MermaidUnavailableError, match="did not finish in time"):
+        asyncio.run(parse_mermaid(FLOWCHART))
+    response = client.post("/mermaid/parse", json={"code": FLOWCHART})
+
+    assert response.status_code == 503
+    assert "valid" not in response.json()
+    assert stray_processes() == []
+
+
+# A process table as the container sees it: pid -> parent pid.
+SERVICE = {1: 0, 7: 1, 20: 7}
+
+
+def test_code_the_sandbox_ran_is_never_taken_for_an_outside_process() -> None:
+    # 30 is a child of the service; 31 its grandchild; 40 an orphan adopted by init.
+    table = {**SERVICE, 30: 20, 31: 30, 40: 1}
+
+    assert not is_injected(30, table)
+    assert not is_injected(31, table)
+    assert not is_injected(40, table)
+    assert not is_injected(1, table)
+
+
+def test_a_health_check_started_from_outside_is_not_a_stray() -> None:
+    # Docker starts 50 from outside the container: its parent is not visible here.
+    # 51 is something the health check itself started.
+    table = {**SERVICE, 50: 0, 51: 50}
+
+    assert is_injected(50, table)
+    assert is_injected(51, table)
+
+
+def test_a_process_that_vanished_mid_scan_is_treated_as_a_stray() -> None:
+    # 60's parent has already exited and is gone from the table.
+    assert not is_injected(60, {**SERVICE, 60: 59})
+    assert not is_injected(99, SERVICE)
+    # A loop cannot happen in a real table, and must not hang the check.
+    assert not is_injected(70, {70: 71, 71: 70})
+
+
+def test_the_stray_check_stays_empty_across_several_docker_health_checks() -> None:
+    """Docker's health check starts a process in this container every five seconds.
+    Before it was recognised, about 3% of checks saw it and reported a stray."""
+    deadline = time.monotonic() + 12
+    sightings = []
+    while time.monotonic() < deadline:
+        sightings.extend(stray_processes())
+
+    assert sightings == []

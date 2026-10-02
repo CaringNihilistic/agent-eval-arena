@@ -38,7 +38,8 @@ export function answerFits(kind: RoundKind, answer: Answer, authors: readonly st
     case "trust":
       return kind === "duel";
     case "accuse":
-      return kind === "duel" || kind === "ranking";
+      // Only where one author could hold both seats. A ranking always has all three.
+      return kind === "duel";
     case "ranking": {
       const seats: readonly Seat[] = SEATS;
       return (

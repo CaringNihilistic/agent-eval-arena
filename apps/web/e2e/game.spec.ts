@@ -33,8 +33,6 @@ async function answerAnyRound(page: Page): Promise<void> {
   if (await author.isVisible()) {
     await author.click();
   } else if (await holds.isVisible()) {
-    const skip = page.getByRole("button", { name: "Skip to the end" });
-    if (await skip.isVisible()) await skip.click();
     await holds.click();
   } else {
     await trust.click();
@@ -100,6 +98,8 @@ test("The Library Gathering: three letters ranked", async ({ page }) => {
 
   await expect(page.getByRole("article")).toHaveCount(3);
   await expectBlind(page);
+  // All three authors are always present, so there is nothing to accuse.
+  await expect(page.getByRole("button", { name: "Accuse: one author, two seats" })).toHaveCount(0);
   for (const seat of ["B", "A", "C"]) {
     await page.getByRole("button", { name: `Letter ${seat}`, exact: true }).click();
   }
@@ -116,15 +116,15 @@ test("The Library Gathering: three letters ranked", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("Does the Timetable Hold?: a paused run and a call", async ({ page }) => {
+test("Does the Timetable Hold?: one letter, the verdict withheld, and a call", async ({ page }) => {
   const errors = watchForErrors(page);
   await page.goto("/timetable");
 
   await expect(page.getByRole("article")).toHaveCount(1);
-  await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Letter A, as written")).toBeVisible();
   await expectBlind(page);
+  await expect(page.getByRole("article")).not.toContainText(/Passed|Failed|Rules met/);
   await expect(page.getByRole("button", { name: "Accuse: one author, two seats" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Skip to the end" }).click();
   await page.getByRole("button", { name: "It holds" }).click();
   await page.getByRole("button", { name: "A hunch" }).click();
   await verdict(page).click();
@@ -132,6 +132,7 @@ test("Does the Timetable Hold?: a paused run and a call", async ({ page }) => {
   await expect(reveal(page)).toBeVisible();
   await expect(page.getByTestId("points-gained")).toContainText(/\+40 points|^0 points/);
   await expect(reveal(page)).toContainText(/Quite right\.|Not so\./);
+  await expect(page.getByRole("article")).toContainText(/Passed|Failed|Rules met/);
   expect(errors).toEqual([]);
 });
 

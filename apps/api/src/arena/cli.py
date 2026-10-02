@@ -232,7 +232,7 @@ def record_bank(
     ] = False,
     take: Annotated[
         int,
-        typer.Option(min=1, max=2, help="1 for the first run of each pair, 2 for the second"),
+        typer.Option(min=1, max=9, help="Which run of each pair to record: 1, 2, 3, ..."),
     ] = 1,
 ) -> None:
     """Record every missing (config, task) run into data/recordings/, then rebuild the index.

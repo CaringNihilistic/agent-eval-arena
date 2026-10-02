@@ -4,11 +4,11 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from sandbox import __version__
-from sandbox.executor import ExecLimits, execute, parse_mermaid
+from sandbox.executor import ExecLimits, MermaidUnavailableError, execute, parse_mermaid
 
 MAX_CODE_CHARS = 20_000
 MAX_TIMEOUT_S = 10.0
@@ -66,6 +66,13 @@ class MermaidResponse(BaseModel):
 
 @app.post("/mermaid/parse")
 async def check_mermaid(request: MermaidRequest) -> MermaidResponse:
-    """Says whether the text parses as a Mermaid diagram. Nothing is rendered."""
-    verdict = await parse_mermaid(request.code)
+    """Says whether the text parses as a Mermaid diagram. Nothing is rendered.
+
+    If the parser itself fails, the answer is 503, never "invalid": a caller
+    must not score a diagram on a verdict that was not given.
+    """
+    try:
+        verdict = await parse_mermaid(request.code)
+    except MermaidUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     return MermaidResponse(valid=verdict.valid, error=verdict.error)

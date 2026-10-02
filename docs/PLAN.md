@@ -1,6 +1,6 @@
 # Agent Eval Arena: Plan
 
-Status: revised 2026-10-03. Checkpoints B and B2 are complete: 180 runs are recorded and the Poison Pen game (Section 0.1) works locally in all five modes. **Sections 0 and 0.1 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
+Status: revised 2026-10-02. Checkpoints B and B2 are complete: 270 runs are recorded (three of every model on every task) and the Poison Pen game (Section 0.1) works locally in all five modes. **Sections 0 and 0.1 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
 
 Where this plan departs from the brief, the departure is listed in [Section 12](#12-deviations-from-the-brief) and the reason is in `DECISIONS.md`.
 
@@ -30,7 +30,7 @@ Where this plan departs from the brief, the departure is listed in [Section 12](
 
 ## 0.1 Checkpoint B2: "Poison Pen: A Wrenfield Hall Mystery"
 
-Requested by the owner on 2026-10-03. The replay site becomes a game with a 1930s country-house theme. This section is the design; where it disagrees with Section 0 on the site's pages, routes, or vote storage, this section wins. The recordings, the scorers, the three configs, and the official-benchmarks data are unchanged.
+Requested by the owner on 2026-10-02. The replay site becomes a game with a 1930s country-house theme. This section is the design; where it disagrees with Section 0 on the site's pages, routes, or vote storage, this section wins. The recordings, the scorers, the three configs, and the official-benchmarks data are unchanged.
 
 **The fiction.** Every evening an unsigned letter appears at dinner at Wrenfield Hall. Each recorded answer is a letter. Six guests sit at the table, but only three authors exist underneath: Haiku 4.5, Sonnet 5.5, and Opus 5.5. The player decides which letters to trust and unmasks the author. No real author's name, detective, or book title appears anywhere; `/about` says "inspired by golden-age detective fiction".
 
@@ -56,20 +56,25 @@ Requested by the owner on 2026-10-03. The replay site becomes a game with a 1930
 - **Elo uses only preferences from The Drawing Room and The Library Gathering, never a trap round**, and never a preference from the Weekend or the Morning Post.
 - **Costume bias and position bias** are reported on the leaderboard once there are at least 30 two-letter preference votes: for each guest, how often the letter in that seat was trusted, against the 50% expected if costumes do not matter.
 
-### Second runs (trap material)
+### Three runs of everything
 
-A second run of every model on every task is recorded with `arena record --take 2`: 90 more runs, same settings, on the subscription, Haiku first, resumable. They are stored as `runs/<config>__<task>__2.jsonl` with `take: 2` in the header. A trap round shows a model's first and second run on one task in two seats. Leaderboard totals ("our 30-task totals") stay on first runs, so the published numbers do not change.
+Every model ran every task three times with the same settings (`arena record --take 2`, `--take 3`): 270 runs. They are stored as `runs/<config>__<task>[__2|__3].jsonl` with `take` in the header.
+
+- **Totals** on the site are over all three runs, shown with the lowest and highest run: "passed 9 of 10 across 3 runs", "met 85–97 of 101 rules". The scorer's rank uses the mean score over all runs.
+- **Run-to-run variance** is on The Official Record: for each model, the tasks whose score changed between identical runs, the mean and largest gap between its best and worst run of a task, and its whole-bank score in its lowest and highest run. It is the noise floor under every comparison on the site.
+- **A trap round** shows any two of a model's three runs on one task.
+- Ordinary duels, rankings, and author rounds use first runs, so one player sees one letter per author per task.
 
 ### Rounds
 
 A round has a kind, and each mode is a way of dealing rounds.
 
-| Kind        | Shows                                           | Asks                                                                                                                  | Right answer?                                                                                                                                                 |
-| ----------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `duel`      | Two letters on one task                         | "Trust letter A", "Equally good", "Neither", "Trust letter B", or "Accuse: one author, two seats"                     | Only the accusation: right when the round is a trap (+50), wrong otherwise (−30). Trusting a letter in a trap round scores nothing and counts as being fooled |
-| `ranking`   | All three authors' letters on one task          | Rank 1-2-3, or accuse                                                                                                 | The ranking has none. An accusation here is always wrong, since all three authors are present; the button is still shown, as specified                        |
-| `author`    | One letter                                      | Which of the three authors wrote it                                                                                   | Yes (+100)                                                                                                                                                    |
-| `timetable` | One run's trace, paused before the final answer | "It holds" or "It falls apart": will it pass the hidden tests (code, agent) or meet all the stated rules (open-ended) | Yes (+40)                                                                                                                                                     |
+| Kind        | Shows                                                                             | Asks                                                                                                                 | Right answer?                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duel`      | Two letters on one task                                                           | "Trust letter A", "Equally good", "Neither", "Trust letter B", or "Accuse: one author, two seats"                    | Only the accusation: right when the round is a trap (+50), wrong otherwise (−30). Trusting a letter in a trap round scores nothing and counts as being fooled |
+| `ranking`   | All three authors' letters on one task                                            | Rank 1-2-3. There is no accusation: all three authors are always present                                             | None                                                                                                                                                          |
+| `author`    | One letter                                                                        | Which of the three authors wrote it                                                                                  | Yes (+100)                                                                                                                                                    |
+| `timetable` | One letter in full, and how it was written. Only the scorer's verdict is withheld | "It holds" or "It falls apart": did it pass the hidden tests (code, agent) or meet all the stated rules (open-ended) | Yes (+40)                                                                                                                                                     |
 
 Confidence ("A hunch", "Fairly sure", "Certain") is chosen before every submission and stored. It does not change points; the Casebook reports how often the player was right at each level.
 
@@ -82,7 +87,7 @@ Confidence ("A hunch", "Fairly sure", "Certain") is chosen before every submissi
 | The Morning Post         | Five rounds, the same for everyone on a given UTC date: author, timetable, duel, author, timetable. The result is shared as squares, for example `Poison Pen · Morning Post No. 14 ■■□■■`                                                                                     | No                |
 
 - **Difficulty in the Weekend.** Rounds 1 to 4 use clear differences; rounds 5 to 10 use close matches and traps. A pair is _close_ when the two runs have the same score and their lengths are within 25% of the longer; otherwise _clear_. For an author round, the letter is _clear_ when its run differs in that way from both other models' runs on the task. The first duel is never a trap; each of the other two is a trap with probability 5/8, which makes about 1 round in 8 a trap.
-- **Timetable rounds need something to watch.** Only runs that used a tool before answering are eligible, because a run that answers in one step shows nothing before its final answer. With both takes that is 50 of 180 runs: 30 by Haiku, 10 each by Sonnet and Opus. 42 of the 50 hold. Flagged to the owner: the pool leans to one model, and "It holds" is right about five times in six.
+- **Timetable rounds are dealt by outcome.** Every one of the 270 runs can be shown. 223 of them hold and 47 fall apart, so dealing at random would make "It holds" right 83% of the time. Instead a round is first chosen to be one that held or one that fell, with equal chance, and then a run of that kind is drawn. Always answering "It holds" is then right about half the time. A cost: 30 of the 47 that fall are explanation tasks, so the kind of task is itself a clue; and a player who works through every round runs out of the ones that fall.
 - **In a duel inside the Morning Post**, the square is filled when the player accused a trap or did not accuse a non-trap.
 
 ### Seeds and round ids
@@ -120,11 +125,11 @@ Postgres: `decisions` replaces `votes` (one row per voter per round, with the fi
 
 ### What B2 built, and what it did not
 
-Built: everything in this section. Tested by 229 unit, component, and service tests (five of them against Postgres) and a Playwright test that plays a round of every mode in a real browser against a production build.
+Built: everything in this section. Tested by 231 unit, component, and service tests (five of them against Postgres) and a Playwright test that plays a round of every mode in a real browser against a production build.
 
 Not built, or built more simply than the brief might suggest:
 
-- **Difficulty for timetable rounds.** There is no clear or close for a single paused run, so they are dealt at random in every position of a Weekend.
+- **Difficulty for timetable rounds.** There is no clear or close for a single letter, so they are dealt the same way in every position of a Weekend.
 - **Swipe.** On a phone the Library Gathering uses tabs to move between the three letters; there is no swipe gesture.
 - **Portraits** are simple generated drawings, as the brief allows, waiting for illustrations.
 - **Open Graph images, run permalinks, the React Flow graph view, deployment.** Unchanged from before B2: not built.

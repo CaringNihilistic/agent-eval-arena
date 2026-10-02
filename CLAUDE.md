@@ -1,6 +1,6 @@
 # Agent Eval Arena
 
-An agent evaluation presented as a game. Three Claude models ran the same 30 tasks, twice. A player sees their answers as unsigned letters in the seats of six fictional guests, decides which to trust without knowing who wrote them, and then sees the authors, our measured results, and Anthropic's published benchmarks. Preferences feed an Elo ranking shown next to the official-benchmark ranking and our scorer.
+An agent evaluation presented as a game. Three Claude models ran the same 30 tasks three times. A player sees their answers as unsigned letters in the seats of six fictional guests, decides which to trust without knowing who wrote them, and then sees the authors, our measured results, and Anthropic's published benchmarks. Preferences feed an Elo ranking shown next to the official-benchmark ranking and our scorer.
 
 The project exists to show skill in agent evaluation and observability. Correct trace data, honest scoring, and reproducibility outrank visual polish.
 
@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current state: Checkpoint B2 complete. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 180 recorded runs, working locally in all five modes. Next (not started, needs the owner's go): README results, deployment to Vercel and Neon, proper guest illustrations. `docs/PLAN.md` Sections 0 and 0.1 are the current design.** Update this line at the end of every checkpoint.
+**Current state: Checkpoint B2 complete. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 270 recorded runs (three of every model on every task), working locally in all five modes. Next (not started, needs the owner's go): README results, deployment to Vercel and Neon, proper guest illustrations. `docs/PLAN.md` Sections 0 and 0.1 are the current design.** Update this line at the end of every checkpoint.
 
 ## How we work
 
@@ -47,7 +47,7 @@ docs/            PLAN.md, DECISIONS.md
 - Docker Desktop must be running. If Docker causes problems, report it and ask before moving anything to WSL.
 - The SQLite file lives in a Docker named volume, never on a Windows bind mount.
 - Ports: web on 3100 (3000 is used by another project on this machine), API on 8000. Both can be changed in `.env`.
-- The sandbox has no network and a read-only filesystem. After changing its dependencies, rebuild the image (`docker compose build sandbox`); `uv` cannot sync inside it.
+- The sandbox has no network and a read-only filesystem. Docker's health check starts a process inside it every five seconds; `is_injected` in `executor.py` is what tells that apart from a process left by executed code. After changing its dependencies, rebuild the image (`docker compose build sandbox`); `uv` cannot sync inside it.
 - Daily development runs the web app on the Windows host and only `api` and `sandbox` in Docker: `pnpm dev:local`. Host dev uses Turbopack and hot-reloads in about a second.
 - The `web` container is a production-build check only (`pnpm web:prodcheck`): it installs, runs `next build`, and serves with `next start`. It sits behind the compose profile `web`, so a plain `docker compose up` does not start it. It keeps its own `node_modules` and `.next` in Docker volumes, and it uses port 3100, so stop host dev first.
 
@@ -71,7 +71,7 @@ node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 docker compose exec api uv run arena list
 docker compose up -d --wait api sandbox                 # needed only to record or run agents
 docker compose exec api uv run arena record             # record every missing run; resumable; uses the subscription
-docker compose exec api uv run arena record --take 2    # the second run of each pair (trap material)
+docker compose exec api uv run arena record --take 2    # a further run of each pair (takes 2 and 3 are recorded)
 docker compose exec api uv run arena record --index-only   # rebuild runs-index and tasks
 docker compose exec api uv run arena run --config claude-haiku-full --task dev-math-01   # uses the subscription
 ```
@@ -128,6 +128,7 @@ The Postgres store tests run only when `TEST_DATABASE_URL` is set (see `apps/web
 - Before a decision the server withholds: config, model, system prompt, run id, tokens, cost, word counts, the scorer's result, thinking blocks, latencies, real timestamps, the agent's working-folder name, the trap flag, and the guests' expressions (PLAN Sections 4.1 and 0.1). Redaction happens on the server, never in the browser.
 - Nothing shown before a decision may depend on recorded time. Replays use one fixed pace.
 - Any new field that reveals the result, the cost, the speed, or the identity of an author must be added to the blind-view redaction and to `WITHHELD_KEYS` in the leak scan, and a new mode must be added to the every-mode leak test.
+- A check that cannot run is an error, never a failed answer: a parser timeout or an unreachable sandbox leaves the run unscored.
 - Points come only from answers that can be right or wrong. A preference earns nothing, and nothing is awarded for agreeing with other players.
 - Elo uses only preferences from The Drawing Room and The Library Gathering, never a trap round.
 - Every decision stores its mode, kind, the guest and position of each letter, confidence, the trap flag, answer lengths, and pass state.
@@ -153,7 +154,7 @@ The Postgres store tests run only when `TEST_DATABASE_URL` is set (see `apps/web
 - Never hardcode API keys. Real keys go in `.env` only. `.env.example` is committed to a public repo and must keep every secret empty; `pnpm lint` checks this.
 - No test may call a real model. Use the scripted fake client.
 - Recordings written to `data/recordings/` are scrubbed of API keys, auth headers, and `.env` values, and a test fails if a key-like pattern appears there.
-- The 180 runs are recorded. Do not re-record or add runs without being asked: a new run replaces a file that rounds and decisions refer to.
+- The 270 runs are recorded. Do not re-record or add runs without being asked: a new run replaces a file that rounds and decisions refer to.
 - Task content is synthetic only.
 - Agent tools have no live web access. `python_exec` runs only in the sandbox container. Never mount the Docker socket.
 - Rate limit counters live in the database, not in memory.

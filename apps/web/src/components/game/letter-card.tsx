@@ -24,8 +24,6 @@ export function LetterCard({
   events,
   steps,
   category,
-  sealed = false,
-  shown,
   children,
 }: {
   seat: Seat;
@@ -35,10 +33,6 @@ export function LetterCard({
   events: readonly TraceEvent[];
   steps: number;
   category: Category;
-  /** A timetable round: the letter is not shown, and the writing of it is laid open. */
-  sealed?: boolean;
-  /** How many trace events the replay has reached, in a sealed round. */
-  shown?: number;
   children?: ReactNode;
 }) {
   const sitter = guestById(guest);
@@ -55,30 +49,20 @@ export function LetterCard({
 
       {children}
 
-      {sealed ? (
-        <section className="flex flex-col gap-2">
-          <h4 className="deco-label text-muted-foreground">How it was written</h4>
-          <TraceList events={events} shown={shown} />
-          <p className="deco-stamp self-start">Sealed</p>
-        </section>
+      <section className="letter-hand" aria-label={`Letter ${seat}, as written`}>
+        <AnswerView answer={answer} category={category} />
+      </section>
+      {hasSomethingToShow(events) ? (
+        <details className="text-sm">
+          <summary className="deco-label cursor-pointer text-muted-foreground">
+            How it was written ({steps} {steps === 1 ? "step" : "steps"})
+          </summary>
+          <div className="mt-3">
+            <TraceList events={events} />
+          </div>
+        </details>
       ) : (
-        <>
-          <section className="letter-hand" aria-label={`Letter ${seat}, as written`}>
-            <AnswerView answer={answer} category={category} />
-          </section>
-          {hasSomethingToShow(events) ? (
-            <details className="text-sm">
-              <summary className="deco-label cursor-pointer text-muted-foreground">
-                How it was written ({steps} {steps === 1 ? "step" : "steps"})
-              </summary>
-              <div className="mt-3">
-                <TraceList events={events} />
-              </div>
-            </details>
-          ) : (
-            <p className="deco-label text-muted-foreground">Written in one sitting</p>
-          )}
-        </>
+        <p className="deco-label text-muted-foreground">Written in one sitting</p>
       )}
     </Parchment>
   );

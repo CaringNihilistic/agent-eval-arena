@@ -25,16 +25,19 @@ import { loadRecordings } from "@/server/recordings";
 const recordings = loadRecordings();
 const { catalog, runs } = recordings;
 const model = (runId: string) => runs.get(runId)!.model;
+const TAKES = new Set([...runs.values()].map((run) => run.take)).size;
 const VOTER = "11111111-2222-4333-8444-555555555555";
 const OTHER = "99999999-2222-4333-8444-555555555555";
 
 describe("the catalog built from the recordings", () => {
-  it("pairs every two authors on every task, and each author with its own second run", () => {
-    expect(runs.size).toBe(180);
+  it("pairs every two authors on every task, and each author with any two of its own runs", () => {
+    expect(runs.size).toBe(90 * TAKES);
     expect(catalog.duels).toHaveLength(90);
-    expect(catalog.traps).toHaveLength(90);
+    // Per author and task: every pair among its runs.
+    expect(catalog.traps).toHaveLength(90 * ((TAKES * (TAKES - 1)) / 2));
     expect(catalog.rankings).toHaveLength(30);
     expect(catalog.authors).toHaveLength(90);
+    expect(catalog.timetables).toHaveLength(runs.size);
   });
 
   it("makes a duel of two different authors and a trap of one author's two runs", () => {
@@ -45,7 +48,7 @@ describe("the catalog built from the recordings", () => {
     }
     for (const trap of catalog.traps) {
       expect(new Set(trap.run_ids.map(model)).size).toBe(1);
-      expect(trap.run_ids.map((id) => runs.get(id)!.take).sort()).toEqual([1, 2]);
+      expect(new Set(trap.run_ids.map((id) => runs.get(id)!.take)).size).toBe(2);
       expect(new Set(trap.run_ids.map((id) => runs.get(id)!.task_id)).size).toBe(1);
       expect(trap.trap).toBe(true);
     }
@@ -57,18 +60,24 @@ describe("the catalog built from the recordings", () => {
     }
   });
 
-  it("offers a timetable round only for a run that did something before answering", () => {
-    expect(catalog.timetables.length).toBeGreaterThan(20);
+  it("offers every run as a timetable round, marked with whether it held", () => {
     for (const content of catalog.timetables) {
-      const worked = recordings
-        .events(content.run_ids[0])
-        .some((event) => event.type === "tool_call" && event.payload.tool !== "submit_answer");
-      expect(worked).toBe(true);
+      const run = runs.get(content.run_ids[0])!;
+      expect(content.holds).toBe(run.passed ?? run.checks_met === run.checks_total);
     }
+    const falls = catalog.timetables.filter((content) => content.holds === false).length;
+    // Far more runs hold than fall, which is why rounds are dealt by outcome.
+    expect(falls).toBeGreaterThan(10);
+    expect(falls / catalog.timetables.length).toBeLessThan(0.3);
   });
 
   it("gives every free-play round an id that does not name its runs or authors", () => {
-    expect(catalog.byId.size).toBe(210 + catalog.timetables.length);
+    expect(catalog.byId.size).toBe(
+      catalog.duels.length +
+        catalog.traps.length +
+        catalog.rankings.length +
+        catalog.timetables.length,
+    );
     for (const [id, entry] of catalog.byId) {
       expect(id).toMatch(/^(dr|lib|tt)\.[0-9a-f]{16}$/);
       for (const runId of entry.content.run_ids) expect(id).not.toContain(runId);
@@ -228,10 +237,11 @@ describe("a Weekend", () => {
 
 describe("the Morning Post", () => {
   it("is numbered by UTC date from the first edition", () => {
-    expect(morningPostNumber(new Date("2026-10-03T00:00:00Z"))).toBe(1);
-    expect(morningPostNumber(new Date("2026-10-03T23:59:59Z"))).toBe(1);
-    expect(morningPostNumber(new Date("2026-10-16T08:00:00Z"))).toBe(14);
-    expect(morningPostDate(14)).toBe("2026-10-16");
+    expect(morningPostNumber(new Date("2026-10-02T00:00:00Z"))).toBe(1);
+    expect(morningPostNumber(new Date("2026-10-02T23:59:59Z"))).toBe(1);
+    expect(morningPostNumber(new Date("2026-10-03T00:00:00Z"))).toBe(2);
+    expect(morningPostNumber(new Date("2026-10-16T08:00:00Z"))).toBe(15);
+    expect(morningPostDate(15)).toBe("2026-10-16");
     expect(morningPostNumber(new Date("2020-01-01T00:00:00Z"))).toBe(1);
   });
 
@@ -282,12 +292,58 @@ describe("free play", () => {
 
   it("falls back to what is left when one kind is used up", () => {
     const allDuels = new Set(
-      [...catalog.byId].filter(([, entry]) => !entry.content.trap).map(([id]) => id),
+      [...catalog.byId]
+        .filter(([, entry]) => entry.mode === "drawing_room" && !entry.content.trap)
+        .map(([id]) => id),
     );
     const id = pickFree(catalog, "drawing_room", allDuels, () => 0.99);
 
     expect(id).not.toBeNull();
     expect(catalog.byId.get(id!)!.content.trap).toBe(true);
+  });
+
+  it("deals timetable rounds by outcome: about half hold and half fall apart", () => {
+    const random = randomFor("timetable");
+    let held = 0;
+    const deals = 4000;
+    for (let deal = 0; deal < deals; deal += 1) {
+      const id = pickFree(catalog, "timetable", new Set(), random)!;
+      if (catalog.byId.get(id)!.content.holds) held += 1;
+    }
+
+    expect(held / deals).toBeGreaterThan(0.46);
+    expect(held / deals).toBeLessThan(0.54);
+  });
+
+  it("deals the timetable rounds of seeded games by outcome too", () => {
+    let held = 0;
+    let rounds = 0;
+    for (let game = 0; game < 300; game += 1) {
+      const contents = [
+        ...weekendContents(catalog, `tt${game}seed`),
+        ...morningPostContents(catalog, game + 1),
+      ];
+      for (const content of contents.filter((item) => item.kind === "timetable")) {
+        rounds += 1;
+        if (content.holds) held += 1;
+      }
+    }
+
+    expect(held / rounds).toBeGreaterThan(0.44);
+    expect(held / rounds).toBeLessThan(0.56);
+  });
+
+  it("when one outcome is used up, deals what is left", () => {
+    const fallen = new Set(
+      [...catalog.byId]
+        .filter(([, entry]) => entry.mode === "timetable" && entry.content.holds === false)
+        .map(([id]) => id),
+    );
+    // A roll that asks for a run that fell apart, when none is left.
+    const id = pickFree(catalog, "timetable", fallen, () => 0.9);
+
+    expect(id).not.toBeNull();
+    expect(catalog.byId.get(id!)!.content.holds).toBe(true);
   });
 
   it("does not resolve an id it did not issue", () => {

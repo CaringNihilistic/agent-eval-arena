@@ -13,6 +13,7 @@ import type {
   ModelTotals,
   OfficialBenchmarks,
   RunHeader,
+  Spread,
 } from "@/lib/types";
 
 /** Modes whose preferences count toward Elo. */
@@ -72,27 +73,44 @@ export function eloVotes(decisions: readonly DecisionRecord[]): PairwiseResult[]
 
 export interface ObjectiveRow extends ModelTotals {
   config: string;
+  runs: number;
+  /** Mean over the runs of the bank. The interval pools every run and so treats repeats of a task as independent. */
   pass_rate: number | null;
   pass_ci: Interval | null;
-  /** Share of stated limits respected. Not a measure of quality. */
+  /** Share of stated limits respected, over every run. Not a measure of quality. */
   constraints_met_rate: number | null;
-  /** Pass counts 1, fail 0, an open-ended run the share of its checks met. */
+  /** Pass counts 1, fail 0, an open-ended run the share of its checks met. Mean over every run. */
   mean_score: number | null;
   mean_steps: number | null;
   mean_latency_ms: number | null;
 }
 
-/** One model's totals over its first run of each task. */
+function spread(values: readonly number[]): Spread {
+  if (values.length === 0) return { mean: 0, min: 0, max: 0 };
+  return { mean: mean(values) ?? 0, min: Math.min(...values), max: Math.max(...values) };
+}
+
+function takesOf(runs: readonly RunHeader[]): number[] {
+  return [...new Set(runs.map((run) => run.take))].sort((a, b) => a - b);
+}
+
+/** One model's totals across every recorded run of the bank, with the range between runs. */
 export function modelTotals(runs: readonly RunHeader[], config: string): ModelTotals {
-  const mine = runs.filter((run) => run.config_id === config && run.take === 1);
-  const scored = mine.filter((run) => run.passed !== null);
-  const open = mine.filter((run) => run.scorer_type === "constraints");
+  const mine = runs.filter((run) => run.config_id === config);
+  const takes = takesOf(mine);
+  const perTake = takes.map((take) => mine.filter((run) => run.take === take));
+  const scored = (subset: readonly RunHeader[]) => subset.filter((run) => run.passed !== null);
+  const open = (subset: readonly RunHeader[]) =>
+    subset.filter((run) => run.scorer_type === "constraints");
+  const first = perTake[0] ?? [];
   return {
-    runs: mine.length,
-    scored_runs: scored.length,
-    passes: scored.filter((run) => run.passed === true).length,
-    checks_met: open.reduce((sum, run) => sum + run.checks_met, 0),
-    checks_total: open.reduce((sum, run) => sum + run.checks_total, 0),
+    takes: takes.length,
+    scored_tasks: scored(first).length,
+    passes: spread(perTake.map((subset) => scored(subset).filter((run) => run.passed).length)),
+    checks_total: open(first).reduce((sum, run) => sum + run.checks_total, 0),
+    checks_met: spread(
+      perTake.map((subset) => open(subset).reduce((sum, run) => sum + run.checks_met, 0)),
+    ),
     mean_answer_words: mean(mine.map((run) => run.answer_words)) ?? 0,
     mean_reference_cost_usd: mean(mine.map((run) => run.reference_cost_usd)) ?? 0,
   };
@@ -103,18 +121,67 @@ export function objectiveTable(
   configs: readonly string[],
 ): ObjectiveRow[] {
   return configs.map((config) => {
-    const mine = runs.filter((run) => run.config_id === config && run.take === 1);
+    const mine = runs.filter((run) => run.config_id === config);
     const totals = modelTotals(runs, config);
+    const scored = mine.filter((run) => run.passed !== null);
+    const passes = scored.filter((run) => run.passed).length;
+    const open = mine.filter((run) => run.scorer_type === "constraints");
+    const met = open.reduce((sum, run) => sum + run.checks_met, 0);
+    const checks = open.reduce((sum, run) => sum + run.checks_total, 0);
     return {
       config,
+      runs: mine.length,
       ...totals,
-      pass_rate: totals.scored_runs > 0 ? totals.passes / totals.scored_runs : null,
-      pass_ci: wilson(totals.passes, totals.scored_runs),
-      constraints_met_rate:
-        totals.checks_total > 0 ? totals.checks_met / totals.checks_total : null,
+      pass_rate: scored.length > 0 ? passes / scored.length : null,
+      pass_ci: wilson(passes, scored.length),
+      constraints_met_rate: checks > 0 ? met / checks : null,
       mean_score: mean(mine.map((run) => run.score)),
       mean_steps: mean(mine.map((run) => run.steps)),
       mean_latency_ms: mean(mine.map((run) => run.latency_ms)),
+    };
+  });
+}
+
+export interface VarianceRow {
+  config: string;
+  takes: number;
+  /** Tasks this model ran more than once. */
+  tasks: number;
+  /** Tasks on which its score was not the same in every run. */
+  tasks_varying: number;
+  /** Over those tasks, the mean gap between its best and worst score (0 to 1). */
+  mean_spread: number | null;
+  /** The largest such gap on any one task. */
+  max_spread: number | null;
+  /** Its mean score over the bank in each run: the least and the most. */
+  bank_score: Spread;
+}
+
+/**
+ * How much each model's score moves between identical runs: same task, same
+ * prompt, same settings. This is the noise floor under every comparison here.
+ */
+export function runVariance(runs: readonly RunHeader[], configs: readonly string[]): VarianceRow[] {
+  return configs.map((config) => {
+    const mine = runs.filter((run) => run.config_id === config);
+    const takes = takesOf(mine);
+    const byTask = new Map<string, number[]>();
+    for (const run of mine)
+      byTask.set(run.task_id, [...(byTask.get(run.task_id) ?? []), run.score]);
+    const repeated = [...byTask.values()].filter((scores) => scores.length > 1);
+    const gaps = repeated.map((scores) => Math.max(...scores) - Math.min(...scores));
+    return {
+      config,
+      takes: takes.length,
+      tasks: repeated.length,
+      tasks_varying: gaps.filter((gap) => gap > 0).length,
+      mean_spread: mean(gaps),
+      max_spread: gaps.length > 0 ? Math.max(...gaps) : null,
+      bank_score: spread(
+        takes.map(
+          (take) => mean(mine.filter((run) => run.take === take).map((run) => run.score)) ?? 0,
+        ),
+      ),
     };
   });
 }
@@ -301,6 +368,8 @@ export interface Leaderboard {
   headline: HeadlineRow[];
   preference: EloRow[];
   objective: ObjectiveRow[];
+  /** How much each model's score moves between identical runs. */
+  variance: VarianceRow[];
   official: OfficialStanding[];
   agreement: AgreementStat;
   length_bias: LengthBias;
@@ -369,6 +438,7 @@ export function buildLeaderboard(
     headline,
     preference,
     objective,
+    variance: runVariance(myRuns, ids),
     official: standings,
     agreement: agreement(mine),
     length_bias: lengthBias(mine),

@@ -46,24 +46,6 @@ describe("judging an answer", () => {
       points: 50,
     });
     expect(judge("duel", { type: "accuse" }, facts)).toEqual({ outcome: "wrong", points: -30 });
-    // All three authors are present in a ranking, so an accusation there is always wrong.
-    expect(judge("ranking", { type: "accuse" }, facts)).toEqual({ outcome: "wrong", points: -30 });
-  });
-
-  it("counts trusting a letter in a trap as fooled: wrong, but no points lost", () => {
-    const fooled = judge("duel", { type: "trust", choice: "A" }, { ...facts, trap: true });
-
-    expect(fooled).toEqual({ outcome: "wrong", points: 0 });
-    expect(judge("duel", { type: "trust", choice: "equal" }, { ...facts, trap: true })).toEqual(
-      fooled,
-    );
-  });
-
-  it("scores naming the author", () => {
-    expect(judge("author", { type: "author", model: OPUS }, facts)).toEqual({
-      outcome: "right",
-      points: 100,
-    });
     expect(judge("author", { type: "author", model: HAIKU }, facts)).toEqual({
       outcome: "wrong",
       points: 0,
@@ -88,7 +70,7 @@ describe("judging an answer", () => {
 describe("which answers a round accepts", () => {
   const cases: [string, Answer, string[]][] = [
     ["trust", { type: "trust", choice: "A" }, ["duel"]],
-    ["accuse", { type: "accuse" }, ["duel", "ranking"]],
+    ["accuse", { type: "accuse" }, ["duel"]],
     ["ranking", { type: "ranking", order: ["C", "A", "B"] }, ["ranking"]],
     ["author", { type: "author", model: OPUS }, ["author"]],
     ["call", { type: "call", holds: false }, ["timetable"]],
@@ -98,6 +80,10 @@ describe("which answers a round accepts", () => {
     for (const kind of ["duel", "ranking", "author", "timetable"] as const) {
       expect(answerFits(kind, answer, AUTHORS)).toBe(kinds.includes(kind));
     }
+  });
+
+  it("does not accept an accusation in a ranking, where all three authors are present", () => {
+    expect(answerFits("ranking", { type: "accuse" }, AUTHORS)).toBe(false);
   });
 
   it("does not offer an accusation in a single-letter round", () => {

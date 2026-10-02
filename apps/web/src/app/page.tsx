@@ -31,7 +31,7 @@ const MODES: { mode: Mode; href: string; blurb: string; note: string }[] = [
     mode: "timetable",
     href: "/timetable",
     blurb:
-      "Watch a letter being written, up to the moment it is sealed. Will it hold up, or fall apart?",
+      "One letter, and the verdict withheld. Did it pass its tests or meet every rule? Say whether it holds or falls apart.",
     note: "A right or wrong answer",
   },
   {

@@ -17,6 +17,7 @@ import {
   officialRanking,
   positionBias,
   rankingToPairwise,
+  runVariance,
 } from "@/lib/leaderboard";
 import type { OfficialBenchmarks, RunHeader } from "@/lib/types";
 import { decision, HAIKU, letter, OPUS, SONNET } from "@/test/decisions";
@@ -235,43 +236,124 @@ function run(changes: Partial<RunHeader>): RunHeader {
   };
 }
 
-describe("our scorer's totals", () => {
-  const runs = [
-    run({}),
-    run({ passed: false, score: 0 }),
+/** One author's three runs of a small bank: two scored tasks and one open-ended. */
+function bank(config: string, perTake: { passes: boolean[]; met: number }[]): RunHeader[] {
+  return perTake.flatMap(({ passes, met }, index) => [
+    ...passes.map((passed, task) =>
+      run({
+        config_id: config,
+        take: index + 1,
+        task_id: `code-0${task + 1}`,
+        passed,
+        score: passed ? 1 : 0,
+      }),
+    ),
     run({
+      config_id: config,
+      take: index + 1,
+      task_id: "writing-01",
       category: "writing",
       scorer_type: "constraints",
       passed: null,
-      score: 0.5,
-      checks_met: 3,
-      checks_total: 6,
+      score: met / 4,
+      checks_met: met,
+      checks_total: 4,
       answer_words: 100,
     }),
-    // A second take: recorded for trap rounds, and not part of the totals.
-    run({ take: 2, passed: false, score: 0, answer_words: 999 }),
-  ];
+  ]);
+}
 
-  it("uses first runs only", () => {
+describe("our scorer's totals", () => {
+  const runs = bank("opus@v1", [
+    { passes: [true, true], met: 4 },
+    { passes: [true, false], met: 2 },
+    { passes: [true, true], met: 3 },
+  ]);
+
+  it("span every run, with the lowest and highest count in any one run", () => {
     const totals = modelTotals(runs, "opus@v1");
 
-    expect(totals).toMatchObject({
-      runs: 3,
-      scored_runs: 2,
-      passes: 1,
-      checks_met: 3,
-      checks_total: 6,
-      mean_answer_words: 60,
+    expect(totals).toMatchObject({ takes: 3, scored_tasks: 2, checks_total: 4 });
+    expect(totals.passes).toEqual({ mean: 5 / 3, min: 1, max: 2 });
+    expect(totals.checks_met).toEqual({ mean: 3, min: 2, max: 4 });
+    expect(totals.mean_answer_words).toBe(60);
+  });
+
+  it("give rates over all runs, and keep pass rate and rules met apart", () => {
+    const [row, empty] = objectiveTable(runs, ["opus@v1", "haiku@v1"]);
+
+    expect(row.runs).toBe(9);
+    expect(row.pass_rate).toBeCloseTo(5 / 6, 6);
+    expect(row.constraints_met_rate).toBe(0.75);
+    expect(row.mean_score).toBeCloseTo((5 + 2.25) / 9, 6);
+    expect(empty).toMatchObject({ runs: 0, takes: 0, pass_rate: null, mean_score: null });
+  });
+
+  it("is the single run's own figures when the bank was run once", () => {
+    const once = modelTotals(
+      runs.filter((item) => item.take === 1),
+      "opus@v1",
+    );
+
+    expect(once.takes).toBe(1);
+    expect(once.passes).toEqual({ mean: 2, min: 2, max: 2 });
+  });
+});
+
+describe("how much a model varies between identical runs", () => {
+  const steady = bank("steady@v1", [
+    { passes: [true, true], met: 4 },
+    { passes: [true, true], met: 4 },
+    { passes: [true, true], met: 4 },
+  ]);
+  const shaky = bank("shaky@v1", [
+    { passes: [true, true], met: 4 },
+    { passes: [true, false], met: 2 },
+    { passes: [true, true], met: 3 },
+  ]);
+  const [steadyRow, shakyRow] = runVariance([...steady, ...shaky], ["steady@v1", "shaky@v1"]);
+
+  it("is zero for a model that scores the same every time", () => {
+    expect(steadyRow).toMatchObject({
+      takes: 3,
+      tasks: 3,
+      tasks_varying: 0,
+      mean_spread: 0,
+      max_spread: 0,
+    });
+    expect(steadyRow.bank_score).toEqual({ mean: 1, min: 1, max: 1 });
+  });
+
+  it("counts the tasks whose score changed and the gap between best and worst run", () => {
+    // code-02 went from pass to fail (gap 1); writing-01 from 4 of 4 to 2 of 4 (gap 0.5).
+    expect(shakyRow).toMatchObject({ takes: 3, tasks: 3, tasks_varying: 2, max_spread: 1 });
+    expect(shakyRow.mean_spread).toBeCloseTo(0.5, 6);
+    expect(shakyRow.bank_score.max).toBe(1);
+    expect(shakyRow.bank_score.min).toBeCloseTo(0.5, 6);
+  });
+
+  it("has nothing to report for a bank run once", () => {
+    const [row] = runVariance(
+      steady.filter((item) => item.take === 1),
+      ["steady@v1"],
+    );
+
+    expect(row).toMatchObject({
+      takes: 1,
+      tasks: 0,
+      tasks_varying: 0,
+      mean_spread: null,
+      max_spread: null,
     });
   });
 
-  it("keeps pass rate and rules met apart, and shows an author with no runs as empty", () => {
-    const [row, empty] = objectiveTable(runs, ["opus@v1", "haiku@v1"]);
+  it("is part of the record, and follows the category filter", () => {
+    const configs = [{ id: "shaky@v1", display_name: "Shaky", model: "m" }];
+    const all = buildLeaderboard(shaky, [], OFFICIAL, configs, null);
+    const code = buildLeaderboard(shaky, [], OFFICIAL, configs, "code");
 
-    expect(row.pass_rate).toBe(0.5);
-    expect(row.constraints_met_rate).toBe(0.5);
-    expect(row.mean_score).toBeCloseTo(0.5, 6);
-    expect(empty).toMatchObject({ runs: 0, pass_rate: null, mean_score: null });
+    expect(all.variance[0].tasks).toBe(3);
+    expect(code.variance[0]).toMatchObject({ tasks: 2, tasks_varying: 1 });
   });
 });
 

@@ -16,7 +16,12 @@ from arena.constraints import (
     strip_fence,
 )
 from arena.runner import run_agent
-from arena.scoring import ScoringError, score_answer, score_constraints
+from arena.scoring import (
+    ScoringError,
+    parse_mermaid_in_sandbox,
+    score_answer,
+    score_constraints,
+)
 from arena.settings import get_settings
 from tests import fakes
 from tests.fakes import ScriptedLLM, says, submits
@@ -348,3 +353,35 @@ def test_code_checker_gives_each_case_a_fresh_copy_of_its_arguments() -> None:
 
     assert passed
     assert config["cases"][0]["args"] == [[1, 2]]
+
+
+async def test_a_parser_failure_is_a_scoring_error_not_a_rejected_diagram(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A parser that timed out says nothing about the diagram. Scoring it as
+    invalid would record a wrong result; the run must be left unscored instead."""
+
+    class Unavailable:
+        status_code = 503
+
+        def json(self) -> dict[str, str]:
+            return {"detail": "The parser did not finish in time."}
+
+    class Client:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+        async def post(self, _url: str, **_kwargs: object) -> Unavailable:
+            return Unavailable()
+
+    monkeypatch.setattr("arena.scoring.httpx.AsyncClient", Client)
+    settings = SETTINGS.model_copy(update={"sandbox_url": "http://sandbox:8001"})
+
+    with pytest.raises(ScoringError, match="HTTP 503"):
+        await parse_mermaid_in_sandbox(settings, "flowchart TD\n  A --> B")

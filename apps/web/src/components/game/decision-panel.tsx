@@ -56,18 +56,14 @@ function Choice({
 /** Ranking: tap the letters in order of trust. */
 function RankingPicker({
   seats,
-  chosen,
   onChoose,
 }: {
   seats: readonly Seat[];
-  chosen: Answer | null;
   onChoose: (answer: Answer | null) => void;
 }) {
   const [order, setOrder] = useState<Seat[]>([]);
   const places = ["First", "Second", "Third"];
-  // Accusing sets the ranking aside without clearing it.
   const active = order;
-  const set = chosen?.type === "ranking";
   const add = (seat: Seat) => {
     const next = [...active, seat];
     setOrder(next);
@@ -105,7 +101,7 @@ function RankingPicker({
       </div>
       <p className="text-sm text-muted-foreground" aria-live="polite">
         {active.length === seats.length
-          ? `Your order: ${active.join(", ")}.${set ? "" : " Set aside while you accuse."}`
+          ? `Your order: ${active.join(", ")}.`
           : `Choose the letter you trust ${places[active.length].toLowerCase()}.`}
       </p>
     </div>
@@ -121,7 +117,6 @@ export function DecisionPanel({
   seats,
   authors,
   question,
-  disabled = false,
   pending,
   error,
   onSubmit,
@@ -131,21 +126,20 @@ export function DecisionPanel({
   authors: readonly AuthorOption[];
   /** Replaces the usual question, for a timetable round. */
   question?: string;
-  /** True while a replay is still running. */
-  disabled?: boolean;
   pending: boolean;
   error: string | null;
   onSubmit: (answer: Answer, confidence: Confidence) => void;
 }) {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [confidence, setConfidence] = useState<Confidence | null>(null);
-  const multi = kind === "duel" || kind === "ranking";
+  // An accusation needs two seats one author could hold. A ranking always has all three authors.
+  const canAccuse = kind === "duel";
 
   return (
     <Panel aria-label="Your verdict" className="flex flex-col gap-4">
       <h3 className="deco-title text-xl">{question ?? QUESTIONS[kind]}</h3>
 
-      <fieldset disabled={disabled || pending} className="flex flex-col gap-3">
+      <fieldset disabled={pending} className="flex flex-col gap-3">
         <legend className="sr-only">Your answer</legend>
         {kind === "duel" ? (
           <div className="flex flex-wrap gap-2">
@@ -175,9 +169,7 @@ export function DecisionPanel({
             />
           </div>
         ) : null}
-        {kind === "ranking" ? (
-          <RankingPicker seats={seats} chosen={answer} onChoose={setAnswer} />
-        ) : null}
+        {kind === "ranking" ? <RankingPicker seats={seats} onChoose={setAnswer} /> : null}
         {kind === "author" ? (
           <div className="flex flex-wrap gap-2">
             {authors.map((author) => (
@@ -207,7 +199,7 @@ export function DecisionPanel({
             />
           </div>
         ) : null}
-        {multi ? (
+        {canAccuse ? (
           <div>
             <Choice
               answer={{ type: "accuse" }}
@@ -220,7 +212,7 @@ export function DecisionPanel({
         ) : null}
       </fieldset>
 
-      <fieldset disabled={disabled || pending} className="flex flex-col gap-2">
+      <fieldset disabled={pending} className="flex flex-col gap-2">
         <legend className="deco-label mb-2 text-muted-foreground">How sure are you?</legend>
         <div className="flex flex-wrap gap-2">
           {CONFIDENCES.map((level) => (
@@ -241,14 +233,11 @@ export function DecisionPanel({
         <Button
           type="button"
           size="lg"
-          disabled={disabled || pending || answer === null || confidence === null}
+          disabled={pending || answer === null || confidence === null}
           onClick={() => answer && confidence && onSubmit(answer, confidence)}
         >
           {pending ? "Sealing…" : "Give your verdict"}
         </Button>
-        {disabled ? (
-          <p className="text-sm text-muted-foreground">The letter is still being written.</p>
-        ) : null}
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}

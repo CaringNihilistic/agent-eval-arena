@@ -9,7 +9,7 @@ const SECTIONS: { title: string; points: string[] }[] = [
     title: "What this is",
     points: [
       "A game laid over an evaluation of three AI models: Claude Haiku 4.5, Sonnet 5.5, and Opus 5.5. The setting is inspired by golden-age detective fiction.",
-      "Each model was given the same 30 tasks, twice, with the same prompt, the same four tools, and the same limits. Only the model differs. That is 180 recorded runs.",
+      "Each model was given the same 30 tasks three times, with the same prompt, the same four tools, and the same limits. Only the model differs. That is 270 recorded runs.",
       "Every letter is one of those recorded answers. Nothing is written while you play.",
       "The tasks are of six kinds: writing, diagrams, explanations, tech-stack recommendations, code, and agent tasks that need tools.",
     ],
@@ -42,16 +42,16 @@ const SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "Impostors",
     points: [
-      "About one Drawing Room round in eight, and some later rounds of a Weekend, show the same model in both seats: its first and second run on the same task. Any preference between them is chance, taste for a costume, or a real difference between two runs of one model.",
+      "About one Drawing Room round in eight, and some later rounds of a Weekend, show the same model in both seats: two of its three runs on the same task. Any preference between them is chance, taste for a costume, or a real difference between two runs of one model.",
       "These rounds never count toward the Official Record's ranking.",
-      "In The Library Gathering all three authors are always present, so an accusation there is always wrong. The button is there all the same.",
+      "In The Library Gathering all three authors are always present, so there is nothing to accuse and no button for it.",
     ],
   },
   {
     title: "Does the timetable hold?",
     points: [
-      "You watch one run and it stops before the final answer. For code and agent tasks, “it holds” means the answer passed hidden tests or matched the one right answer. For the other tasks it means the letter met every rule the task stated.",
-      "Only runs that used a tool before answering are used, because a run that answers in one step shows nothing to watch. That is a minority of runs, mostly Haiku's, and most of them hold.",
+      "You see one letter and how it was written, and the scorer's verdict is withheld. For code and agent tasks, “it holds” means the answer passed hidden tests or matched the one right answer. For the other tasks it means the letter met every rule the task stated.",
+      "Far more letters hold than fall apart, so rounds are dealt by outcome: about half the time you are shown one that held and half the time one that did not. Guessing “it holds” every time is right only about half the time.",
     ],
   },
   {
@@ -68,15 +68,15 @@ const SECTIONS: { title: string; points: string[] }[] = [
     points: [
       "Players: Elo with K=32, starting at 1000, replayed in order, with a 95% bootstrap interval. It uses only preferences from The Drawing Room and The Library Gathering. A ranking of three letters counts as three comparisons.",
       "Official benchmarks: Anthropic's published scores, copied from its announcement pages with the source and the date checked. Two models are compared only on benchmarks reported for both. Anthropic reports no benchmark that Haiku 4.5 shares with the two newer models, so Haiku has no official rank here.",
-      "Our scorer: a pass counts 1, a fail 0, and an open-ended letter the share of its rules met, over each model's first run of the 30 tasks.",
+      "Our scorer: a pass counts 1, a fail 0, and an open-ended letter the share of its rules met, averaged over all three runs of the 30 tasks. Totals are shown with the lowest and highest run.",
       "The official benchmarks measure different tasks from ours, at higher effort settings. They are shown for comparison, not as a target.",
     ],
   },
   {
     title: "Limits of this data",
     points: [
-      "Two runs per model per task, and the totals use the first. Model output varies from run to run.",
-      "Pass rates rest on ten tasks per model, so the intervals are wide.",
+      "Three runs per model per task. Model output varies from run to run, and the Official Record shows by how much: the same model on the same task does not always get the same score.",
+      "Pass rates rest on ten tasks per model, each run three times. Repeats of a task are not independent, so the intervals shown are narrower than they should be.",
       "The models ran through Claude Code's agent loop on a subscription, capped at 1,024 output tokens per call, with thinking off for Haiku 4.5 and at the lowest effort for the other two. Results at other settings would differ.",
       "Every run cost $0. The cost shown “at API rates” applies Anthropic's list prices to the measured tokens.",
       "Votes on a public site can be manipulated. One decision per browser per round, with rate limits per address, is all that guards them. There are no accounts: you are an anonymous id kept in this browser.",

@@ -8,7 +8,7 @@
 import { GUEST_IDS, type GuestId } from "@/lib/guests";
 import { hashId, pick, randomFor, shuffled } from "@/lib/seed";
 import type { Mode, RoundKind, RunHeader, Seat } from "@/lib/types";
-import { SEATS } from "@/lib/types";
+import { holds, SEATS } from "@/lib/types";
 
 /** Share of Drawing Room rounds that show one model twice. */
 export const TRAP_RATE = 1 / 8;
@@ -41,7 +41,7 @@ export const MORNING_POST_KINDS: readonly RoundKind[] = [
 ];
 export const MORNING_POST_TRAP_RATE = 1 / 2;
 /** The date of Morning Post No. 1, in UTC. */
-export const MORNING_POST_EPOCH = "2026-10-03";
+export const MORNING_POST_EPOCH = "2026-10-02";
 
 const FREE_PREFIX = { drawing_room: "dr", library: "lib", timetable: "tt" } as const;
 type FreeMode = keyof typeof FREE_PREFIX;
@@ -57,6 +57,8 @@ export interface Content {
   trap: boolean;
   /** True when the runs are hard to tell apart by score and length. */
   close: boolean;
+  /** For a timetable round: whether the run held up. Null for every other kind. */
+  holds: boolean | null;
 }
 
 export interface Catalog {
@@ -81,11 +83,8 @@ function freeId(mode: FreeMode, content: Content): string {
   return `${FREE_PREFIX[mode]}.${hashId(content.key)}`;
 }
 
-/**
- * Everything that can be dealt, from the recorded runs. `watchable` holds the
- * runs that did visible work before answering; only those make a timetable round.
- */
-export function buildCatalog(runs: readonly RunHeader[], watchable: ReadonlySet<string>): Catalog {
+/** Everything that can be dealt, from the recorded runs. */
+export function buildCatalog(runs: readonly RunHeader[]): Catalog {
   const byTask = new Map<string, RunHeader[]>();
   for (const run of runs) {
     byTask.set(run.task_id, [...(byTask.get(run.task_id) ?? []), run]);
@@ -115,22 +114,29 @@ export function buildCatalog(runs: readonly RunHeader[], watchable: ReadonlySet<
           run_ids: ids,
           trap: false,
           close: isClose(first[i], first[j]),
+          holds: null,
         });
       }
     }
 
     for (const run of first) {
-      const second = all.find((other) => other.take === 2 && other.config_id === run.config_id);
-      if (second) {
-        const ids = [run.run_id, second.run_id].sort();
-        catalog.traps.push({
-          kind: "duel",
-          key: `duel|${taskId}|${ids.join("|")}`,
-          task_id: taskId,
-          run_ids: ids,
-          trap: true,
-          close: true,
-        });
+      // An impostor round: any two of this author's runs on the task.
+      const takes = all
+        .filter((other) => other.config_id === run.config_id)
+        .sort((x, y) => x.take - y.take);
+      for (let i = 0; i < takes.length; i += 1) {
+        for (let j = i + 1; j < takes.length; j += 1) {
+          const ids = [takes[i].run_id, takes[j].run_id].sort();
+          catalog.traps.push({
+            kind: "duel",
+            key: `duel|${taskId}|${ids.join("|")}`,
+            task_id: taskId,
+            run_ids: ids,
+            trap: true,
+            close: true,
+            holds: null,
+          });
+        }
       }
       const others = first.filter((other) => other !== run);
       catalog.authors.push({
@@ -141,6 +147,7 @@ export function buildCatalog(runs: readonly RunHeader[], watchable: ReadonlySet<
         trap: false,
         // Hard to place when it resembles another author's letter on this task.
         close: others.some((other) => isClose(run, other)),
+        holds: null,
       });
     }
 
@@ -152,10 +159,12 @@ export function buildCatalog(runs: readonly RunHeader[], watchable: ReadonlySet<
         run_ids: first.map((run) => run.run_id).sort(),
         trap: false,
         close: false,
+        holds: null,
       });
     }
 
-    for (const run of all.filter((item) => watchable.has(item.run_id))) {
+    // Every run can be put to the question "does it hold?".
+    for (const run of all) {
       catalog.timetables.push({
         kind: "timetable",
         key: `timetable|${run.run_id}`,
@@ -163,6 +172,7 @@ export function buildCatalog(runs: readonly RunHeader[], watchable: ReadonlySet<
         run_ids: [run.run_id],
         trap: false,
         close: false,
+        holds: holds(run),
       });
     }
   }
@@ -235,6 +245,20 @@ function draw(
   return chosen;
 }
 
+/** Chance that a timetable round is dealt from the runs that held up. */
+export const TIMETABLE_HOLDS_RATE = 1 / 2;
+
+/**
+ * The timetable rounds to draw from, chosen by outcome first so that "it holds"
+ * and "it falls apart" are each right about half the time, although far more
+ * runs hold than fall.
+ */
+function timetablePool(contents: readonly Content[], random: () => number): Content[] {
+  const wanted = random() < TIMETABLE_HOLDS_RATE;
+  const pool = contents.filter((content) => content.holds === wanted);
+  return pool.length > 0 ? pool : [...contents];
+}
+
 /** The ten rounds of a Weekend for a seed. Early rounds are clear, later ones close. */
 export function weekendContents(catalog: Catalog, seed: string): Content[] {
   const random = randomFor(`weekend|${seed}`);
@@ -249,7 +273,9 @@ export function weekendContents(catalog: Catalog, seed: string): Content[] {
         random,
       );
     }
-    if (kind === "timetable") return draw(catalog.timetables, catalog.timetables, used, random);
+    if (kind === "timetable") {
+      return draw(timetablePool(catalog.timetables, random), catalog.timetables, used, random);
+    }
     const different = catalog.duels.filter((content) => content.close === hard);
     // Drawn even when not used, so the same seed gives the same later rounds.
     const trap = random() < WEEKEND_TRAP_RATE;
@@ -278,7 +304,9 @@ export function morningPostContents(catalog: Catalog, number: number): Content[]
   const used = new Set<string>();
   return MORNING_POST_KINDS.map((kind) => {
     if (kind === "author") return draw(catalog.authors, catalog.authors, used, random);
-    if (kind === "timetable") return draw(catalog.timetables, catalog.timetables, used, random);
+    if (kind === "timetable") {
+      return draw(timetablePool(catalog.timetables, random), catalog.timetables, used, random);
+    }
     const trap = random() < MORNING_POST_TRAP_RATE;
     if (trap && catalog.traps.length > 0) return draw(catalog.traps, catalog.traps, used, random);
     return draw(catalog.duels, catalog.duels, used, random);
@@ -372,8 +400,9 @@ export function pickFree(
     return ids.length > 0 ? pick(ids, random) : null;
   }
   if (mode === "timetable") {
-    const ids = open(catalog.timetables);
-    return ids.length > 0 ? pick(ids, random) : null;
+    const left = catalog.timetables.filter((content) => !decided.has(freeId(mode, content)));
+    if (left.length === 0) return null;
+    return freeId(mode, pick(timetablePool(left, random), random));
   }
   const traps = open(catalog.traps);
   const duels = open(catalog.duels);

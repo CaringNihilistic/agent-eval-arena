@@ -7,8 +7,9 @@ export const metadata: Metadata = { title: "Does the Timetable Hold? · Poison P
 export default function TimetablePage() {
   return (
     <ModePage mode="timetable">
-      You watch one letter being written, and the account stops just before it is sealed. Will the
-      finished answer hold up, or fall apart? Forty points for calling it right.
+      One letter, and how it was written. The verdict is withheld: did the answer pass its hidden
+      tests, or meet every rule the task set? Say whether it holds or falls apart. Forty points for
+      calling it right.
     </ModePage>
   );
 }

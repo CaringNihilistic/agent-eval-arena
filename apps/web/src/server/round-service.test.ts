@@ -143,9 +143,9 @@ describe("redaction in every mode", () => {
       expectBlind(view as BlindRound, entry.content.run_ids);
       counts[entry.mode] += 1;
     }
-    expect(counts.drawing_room).toBe(180);
+    expect(counts.drawing_room).toBe(catalog.duels.length + catalog.traps.length);
     expect(counts.library).toBe(30);
-    expect(counts.timetable).toBeGreaterThan(20);
+    expect(counts.timetable).toBe(runs.size);
   });
 
   it("serves the rounds of many Weekends and Morning Posts blind", async () => {
@@ -164,30 +164,22 @@ describe("redaction in every mode", () => {
     }
   });
 
-  it("pauses a timetable round before the answer, in all three places it appears", async () => {
+  it("shows a timetable round's letter in full and withholds only the verdict", async () => {
     const store = memoryStore();
     for (const [id, entry] of catalog.byId) {
       if (entry.mode !== "timetable") continue;
       const view = (await roundView(recordings, store, id, ME)) as BlindRound;
       const [letter] = view.letters;
-      const calls = letter.events.filter((event) => event.type === "llm_call");
-      const last = calls[calls.length - 1];
+      const finished = recordings
+        .events(entry.content.run_ids[0])
+        .find((event) => event.type === "run_finished");
 
-      expect(letter.final_answer).toBeNull();
-      expect(last.type === "llm_call" && last.payload.output.content).toBeNull();
-      for (const event of letter.events) {
-        if (event.type === "tool_call" && event.payload.tool === "submit_answer") {
-          expect(event.payload.arguments).toEqual({});
-        }
-        if (event.type === "llm_call") {
-          for (const call of event.payload.output.tool_calls) {
-            if (call.tool === "submit_answer") expect(call.arguments).toEqual({});
-          }
-        }
-        if (event.type === "run_finished") expect(event.payload.final_answer).toBeNull();
-      }
-      // There is still something to watch.
-      expect(letter.events.some((event) => event.type === "tool_call")).toBe(true);
+      expect(letter.final_answer).toBe(
+        finished?.type === "run_finished" ? finished.payload.final_answer : undefined,
+      );
+      // Whether it held is the question, so nothing of the scorer's result may be there.
+      expect(letter.events.some((event) => event.type === "score_computed")).toBe(false);
+      expect(JSON.stringify(view)).not.toMatch(/"holds"|"passed"|"checks"|hidden tests passed/);
     }
   });
 
@@ -241,7 +233,7 @@ describe("The Drawing Room", () => {
     expect(reveal).toMatchObject({ decided: true, trap: false, outcome: "none", points: 0 });
     expect(reveal.letters.map((letter) => letter.expression)).toEqual(["happy", "shocked"]);
     expect(new Set(reveal.letters.map((letter) => letter.model)).size).toBe(2);
-    expect(reveal.letters[0].totals.runs).toBe(30);
+    expect(reveal.letters[0].totals.scored_tasks).toBe(10);
     expect(reveal.letters[0].events.some((event) => event.type === "score_computed")).toBe(true);
     expect(reveal.progress).toMatchObject({ points_total: 0, rank: "Guest" });
     expect(reveal.official.benchmarks.length).toBeGreaterThan(0);
@@ -286,7 +278,7 @@ describe("The Drawing Room", () => {
     expect(reveal).toMatchObject({ trap: true, outcome: "right", points: 50 });
     expect(reveal.letters.map((letter) => letter.expression)).toEqual(["flustered", "flustered"]);
     expect(new Set(reveal.letters.map((letter) => letter.model)).size).toBe(1);
-    expect(reveal.letters.map((letter) => letter.take).sort()).toEqual([1, 2]);
+    expect(new Set(reveal.letters.map((letter) => letter.take)).size).toBe(2);
     expect(reveal.progress?.unlocked.map((d) => d.id)).toEqual(["spotted_the_impostor"]);
   });
 
@@ -316,7 +308,8 @@ describe("The Drawing Room", () => {
     expect(traps / 800).toBeLessThan(0.17);
 
     const seen = new Set<string>();
-    for (let deal = 0; deal < 180; deal += 1) {
+    const all = catalog.duels.length + catalog.traps.length;
+    for (let deal = 0; deal < all; deal += 1) {
       const { round } = await nextRound(recordings, store, {
         voterId: ME,
         mode: "drawing_room",
@@ -379,14 +372,12 @@ describe("The Library Gathering", () => {
     expect(reveal.official.benchmarks.some((b) => b.scores.length === 2)).toBe(true);
   });
 
-  it("treats an accusation as wrong, since all three authors are present", async () => {
+  it("does not take an accusation: all three authors are always present", async () => {
     const store = memoryStore();
     const { round } = await nextRound(recordings, store, { voterId: ME, mode: "library" });
 
-    expect(await play(store, round!.round_id, { type: "accuse" })).toMatchObject({
-      outcome: "wrong",
-      points: -30,
-    });
+    expect(await status(play(store, round!.round_id, { type: "accuse" }))).toBe(400);
+    expect(store.rows).toHaveLength(0);
   });
 
   it("rejects a ranking that is not each letter once", async () => {
@@ -401,18 +392,38 @@ describe("The Library Gathering", () => {
 });
 
 describe("Does the Timetable Hold?", () => {
-  it("deals one paused run and scores the call", async () => {
+  it("deals one letter with its answer shown, and scores the call", async () => {
     const store = memoryStore();
     const { round } = await nextRound(recordings, store, { voterId: ME, mode: "timetable" });
     expect(round).toMatchObject({ kind: "timetable", mode: "timetable" });
     expect(round!.letters).toHaveLength(1);
-    expect(round!.letters[0].final_answer).toBeNull();
+    expect(round!.letters[0].final_answer).not.toBeNull();
 
     const right = await play(store, round!.round_id, answerFor(round!, true));
 
     expect(right).toMatchObject({ outcome: "right", points: 40 });
-    expect(right.letters[0].final_answer).not.toBeNull();
+    expect(right.letters[0].score).not.toBeNull();
     expect(right.letters[0].expression).toBe(right.letters[0].holds ? "happy" : "shocked");
+  });
+
+  it("deals letters that hold and letters that fall apart about equally", async () => {
+    const store = memoryStore();
+    const random = randomFor("timetable-deals");
+    let held = 0;
+    const deals = 1000;
+    for (let deal = 0; deal < deals; deal += 1) {
+      const { round } = await nextRound(recordings, store, {
+        voterId: ME,
+        mode: "timetable",
+        random,
+      });
+      const run = runs.get(seatedRuns(round!)[0])!;
+      if (run.passed ?? run.checks_met === run.checks_total) held += 1;
+    }
+
+    // Always answering "it holds" is right about half the time, not most of it.
+    expect(held / deals).toBeGreaterThan(0.44);
+    expect(held / deals).toBeLessThan(0.56);
   });
 
   it("gives nothing for the wrong call, and does not offer an accusation", async () => {

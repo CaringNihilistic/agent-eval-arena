@@ -7,7 +7,6 @@ import { join } from "node:path";
 
 import type { TraceEvent } from "@arena/schema";
 
-import { hasVisibleWork } from "@/lib/blind-view";
 import type { ConfigInfo } from "@/lib/leaderboard";
 import { buildCatalog, type Catalog } from "@/lib/rounds";
 import type { OfficialBenchmarks, PublicTask, RunHeader } from "@/lib/types";
@@ -56,15 +55,12 @@ export function makeRecordings(
       model: run.model,
     });
   }
-  const watchable = new Set(
-    headers.filter((run) => hasVisibleWork(events(run.run_id))).map((run) => run.run_id),
-  );
   return {
     runs,
     tasks: new Map(tasks.map((task) => [task.id, task])),
     configs: [...configs.values()].sort((a, b) => a.id.localeCompare(b.id)),
     official,
-    catalog: buildCatalog(headers, watchable),
+    catalog: buildCatalog(headers),
     events,
   };
 }

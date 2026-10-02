@@ -11,14 +11,13 @@ const AUTHORS = [
   { model: "claude-sonnet-5-5", label: "Sonnet 5.5" },
 ];
 
-function setup(kind: RoundKind, seats: Seat[] = ["A", "B"], disabled = false) {
+function setup(kind: RoundKind, seats: Seat[] = ["A", "B"]) {
   const onSubmit = vi.fn();
   render(
     <DecisionPanel
       kind={kind}
       seats={seats}
       authors={AUTHORS}
-      disabled={disabled}
       pending={false}
       error={null}
       onSubmit={onSubmit}
@@ -113,7 +112,12 @@ describe("the verdict panel", () => {
 
     await user.click(screen.getByRole("button", { name: "Start again" }));
     expect(submit()).toBeDisabled();
-    expect(screen.getByRole("button", { name: ACCUSE_LABEL })).toBeInTheDocument();
+  });
+
+  it("offers no accusation in the Library, where all three authors are always present", () => {
+    setup("ranking", ["A", "B", "C"]);
+
+    expect(screen.queryByRole("button", { name: ACCUSE_LABEL })).not.toBeInTheDocument();
   });
 
   it("offers the three authors, and no accusation, in a single-letter round", async () => {
@@ -139,12 +143,5 @@ describe("the verdict panel", () => {
     await user.click(submit());
 
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith({ type: "call", holds: false }, "fairly");
-  });
-
-  it("cannot be used while a replay is still running", () => {
-    setup("timetable", ["A"], true);
-
-    expect(screen.getByRole("button", { name: "It holds" })).toBeDisabled();
-    expect(submit()).toBeDisabled();
   });
 });

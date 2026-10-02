@@ -56,11 +56,11 @@ function letter(
     latency_ms: 1730,
     stop_reason: "answered",
     totals: {
-      runs: 30,
-      scored_runs: 10,
-      passes: 9,
-      checks_met: 85,
+      takes: 3,
+      scored_tasks: 10,
+      passes: { mean: 9.33, min: 9, max: 10 },
       checks_total: 101,
+      checks_met: { mean: 92, min: 85, max: 97 },
       mean_answer_words: 79,
       mean_reference_cost_usd: 0.006,
     },
@@ -134,7 +134,9 @@ describe("The Gathering in the Library", () => {
     expect(within(first).getByText(/53 words/)).toBeInTheDocument();
     expect(within(first).getByText(/\$0\.0042 at API rates/)).toBeInTheDocument();
     expect(
-      within(first).getByText(/passed 9 of 10 with a right answer, met 85 of 101 rules/),
+      within(first).getByText(
+        /across 3 runs: passed 9–10 of 10 with a right answer, met 85–97 of 101 rules/,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("Rules met 1/2")).toBeInTheDocument();
   });
@@ -259,24 +261,5 @@ describe("a letter before the decision", () => {
     );
 
     expect(screen.getByLabelText("Letter B, as written")).toHaveClass("letter-hand");
-  });
-
-  it("keeps a sealed letter sealed, and lays the writing of it open", () => {
-    show(
-      <LetterCard
-        seat="A"
-        guest="pike"
-        answer={null}
-        events={blind}
-        steps={2}
-        category="agent"
-        sealed
-        shown={3}
-      />,
-    );
-
-    expect(screen.getByText("Sealed")).toBeInTheDocument();
-    expect(screen.getByText("I will compute it.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Letter A, as written")).not.toBeInTheDocument();
   });
 });

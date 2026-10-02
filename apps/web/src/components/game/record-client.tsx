@@ -7,6 +7,7 @@ import { OfficialBenchmarksPanel } from "@/components/game/official-panel";
 import { Parchment } from "@/components/theme/ornament";
 import { Button } from "@/components/ui/button";
 import { fetchLeaderboard, type LeaderboardResponse } from "@/lib/client-api";
+import { rangeText } from "@/lib/format";
 import { guest as guestById } from "@/lib/guests";
 import type { PickRate } from "@/lib/leaderboard";
 import type { Interval } from "@/lib/stats";
@@ -82,6 +83,7 @@ function Entries({ board }: { board: LeaderboardResponse }) {
   const name = (config: string) =>
     board.headline.find((row) => row.config === config)?.model ?? config;
   const agreement = board.agreement;
+  const takes = Math.max(1, ...board.objective.map((row) => row.takes));
   const byMode = Object.entries(board.votes_by_mode)
     .map(([mode, count]) => `${count} from ${MODE_NAMES[mode as Mode]}`)
     .join(", ");
@@ -104,7 +106,9 @@ function Entries({ board }: { board: LeaderboardResponse }) {
         <p className="text-xs text-muted-foreground">
           Official rank compares two models only on benchmarks Anthropic reports for both. Our
           scorer counts a pass as 1, a fail as 0, and an open-ended letter as the share of stated
-          rules it met. The official rank does not change with the category.
+          rules it met. The official rank does not change with the category. Two authors whose
+          scores differ by less than either moves between identical runs (see below) are not really
+          ranked by it.
         </p>
       </Entry>
 
@@ -131,7 +135,7 @@ function Entries({ board }: { board: LeaderboardResponse }) {
 
       <Entry
         title="Our scorer"
-        note="First run of each author on each task. Pass rate covers code and agent tasks, which have a right answer. Rules met covers the open-ended tasks and says only that stated limits were respected, not that the letter was good."
+        note={`Every task was run ${takes} times with the same settings. Percentages are over all of those runs; the figures after them are the lowest and highest count in any one run. Pass rate covers code and agent tasks, which have a right answer. Rules met covers the open-ended tasks and says only that stated limits were respected, not that the letter was good.`}
       >
         <Table
           caption="Automatic scores and costs per author"
@@ -146,12 +150,12 @@ function Entries({ board }: { board: LeaderboardResponse }) {
           ]}
           rows={board.objective.map((row) => [
             name(row.config),
-            row.scored_runs === 0
+            row.scored_tasks === 0
               ? "—"
-              : `${row.passes}/${row.scored_runs} · ${percent(row.pass_rate)}${range(row.pass_ci)}`,
+              : `${percent(row.pass_rate)}${range(row.pass_ci)} · ${rangeText(row.passes)} of ${row.scored_tasks}`,
             row.checks_total === 0
               ? "—"
-              : `${row.checks_met}/${row.checks_total} · ${percent(row.constraints_met_rate)}`,
+              : `${percent(row.constraints_met_rate)} · ${rangeText(row.checks_met)} of ${row.checks_total}`,
             row.runs === 0 ? "—" : `${Math.round(row.mean_answer_words)} words`,
             row.mean_steps === null ? "—" : row.mean_steps.toFixed(1),
             row.mean_latency_ms === null ? "—" : `${(row.mean_latency_ms / 1000).toFixed(1)} s`,
@@ -161,6 +165,35 @@ function Entries({ board }: { board: LeaderboardResponse }) {
         <p className="text-xs text-muted-foreground">
           Every run cost $0: they ran on a subscription. The cost column applies Anthropic&apos;s
           list prices to the measured tokens.
+        </p>
+      </Entry>
+
+      <Entry
+        title="How much the same author varies"
+        note={`Each author answered every task ${takes} times: same task, same prompt, same settings. This is how far its score moved between those identical runs, and it is the noise under every comparison on this page.`}
+      >
+        <Table
+          caption="Run-to-run variance of each author's score"
+          head={[
+            "Author",
+            "Tasks where the score changed",
+            "Mean gap, best to worst run",
+            "Largest gap on one task",
+            "Whole-bank score, lowest to highest run",
+          ]}
+          rows={board.variance.map((row) => [
+            name(row.config),
+            row.tasks === 0 ? "—" : `${row.tasks_varying} of ${row.tasks}`,
+            row.mean_spread === null ? "—" : `${(row.mean_spread * 100).toFixed(1)} points`,
+            row.max_spread === null ? "—" : `${Math.round(row.max_spread * 100)} points`,
+            row.takes === 0
+              ? "—"
+              : `${(row.bank_score.min * 100).toFixed(1)}% to ${(row.bank_score.max * 100).toFixed(1)}%`,
+          ])}
+        />
+        <p className="text-xs text-muted-foreground">
+          A score is 100 for a pass, 0 for a fail, and for an open-ended letter the percentage of
+          its rules met. A gap of 25 points on a four-rule task is one rule.
         </p>
       </Entry>
 

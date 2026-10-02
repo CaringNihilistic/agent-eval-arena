@@ -25,23 +25,6 @@ import {
   type Seat,
 } from "@/lib/types";
 
-/**
- * A paused run is replayed at this fixed pace. The real pace is hidden on
- * purpose: speed would identify the author.
- */
-export const REPLAY_PACE_MS = 450;
-
-/** How many trace events are on screen. Counts up at a fixed pace. */
-function usePlayback(total: number, active: boolean): [number, () => void] {
-  const [shown, setShown] = useState(0);
-  useEffect(() => {
-    if (!active || shown >= total) return;
-    const timer = window.setTimeout(() => setShown((count) => count + 1), REPLAY_PACE_MS);
-    return () => window.clearTimeout(timer);
-  }, [active, shown, total]);
-  return [active ? shown : total, () => setShown(total)];
-}
-
 function TaskCard({ round }: { round: BlindRound | RevealedRound }) {
   return (
     <Panel className="flex flex-col gap-2">
@@ -57,8 +40,8 @@ function TaskCard({ round }: { round: BlindRound | RevealedRound }) {
 function timetableQuestion(round: BlindRound): string {
   const openEnded = !["code", "agent"].includes(round.task.category);
   return openEnded
-    ? "Does the timetable hold? Will the letter meet all the rules it was given?"
-    : "Does the timetable hold? Will the answer pass the hidden tests?";
+    ? "Does the timetable hold? Does this letter meet every rule it was given?"
+    : "Does the timetable hold? Will this answer pass the hidden tests?";
 }
 
 /** A round awaiting the player's decision. */
@@ -73,9 +56,7 @@ function BlindTable({
   error: string | null;
   onSubmit: (answer: Answer, confidence: Confidence) => void;
 }) {
-  const sealed = round.kind === "timetable";
-  const [shown, skip] = usePlayback(round.letters[0].events.length, sealed);
-  const replaying = sealed && shown < round.letters[0].events.length;
+  const timetable = round.kind === "timetable";
   const [tab, setTab] = useState<Seat>("A");
   const many = round.letters.length === 3;
   const columns = many ? "lg:grid-cols-3" : round.letters.length === 2 ? "lg:grid-cols-2" : "";
@@ -107,23 +88,15 @@ function BlindTable({
               events={letter.events}
               steps={letter.steps}
               category={round.task.category}
-              sealed={sealed}
-              shown={shown}
             />
           </div>
         ))}
       </div>
-      {replaying ? (
-        <Button variant="ghost" className="self-start" onClick={skip}>
-          Skip to the end
-        </Button>
-      ) : null}
       <DecisionPanel
         kind={round.kind}
         seats={round.letters.map((letter) => letter.seat)}
         authors={round.authors}
-        question={sealed ? timetableQuestion(round) : undefined}
-        disabled={replaying}
+        question={timetable ? timetableQuestion(round) : undefined}
         pending={pending}
         error={error}
         onSubmit={onSubmit}

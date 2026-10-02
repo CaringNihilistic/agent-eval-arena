@@ -2,6 +2,21 @@
 
 Things learned about models and providers while building and running the arena. Each entry is backed by a recorded response or trace in this repository. Entries marked **README** belong in the results section of the final README.
 
+## Headline: the same model, the same task, a different score
+
+**Three identical runs of every model on every task, all on 2026-10-02.** Same prompt, same tools, same settings, 270 runs. Detail in entry 10.
+
+| Model      | Tasks whose score changed between runs | Mean gap, best to worst run of a task | Whole-bank score, lowest to highest run |
+| ---------- | -------------------------------------- | ------------------------------------- | --------------------------------------- |
+| Haiku 4.5  | 9 of 30                                | 9.0 points                            | 88.0% to 93.7%                          |
+| Sonnet 5.5 | 5 of 30                                | 3.2 points                            | 95.2% to 97.5%                          |
+| Opus 5.5   | 4 of 30                                | 3.1 points                            | 95.8% to 97.5%                          |
+
+- **Sonnet and Opus cannot be ranked by this scorer.** Over all runs they score 96.6% and 96.5%. Each moves about two points between identical runs, more than twenty times the gap between them, and which one is ahead changes with the run: Sonnet led in the first, Opus in the third.
+- **Haiku is separated from the other two, and is the least steady.** Its best run (93.7%) is below their worst (95.2%), and it changed score on nearly a third of the tasks.
+- **All of the movement is in the open-ended tasks.** No model's pass or fail on any code or agent task changed in three runs. What moves is whether a letter kept to its stated rules.
+- **One run is not a measurement.** The first run alone had Haiku meeting 85 of 101 rules, 11 to 13 behind the others. The next two had it at 97 and 95, level with them.
+
 ## 1. gpt-oss-120b on Groq cannot use a custom code tool (README)
 
 **Observed 2026-10-02**, model `groq/openai/gpt-oss-120b`, Groq free plan.
@@ -141,7 +156,7 @@ Requests refused with HTTP 503 appear to count against the daily quota: `gemini-
 
 ## 9. The second runs: how much one model varies from run to run
 
-**Recorded 2026-10-03.** A second run of every model on every task, same settings, for the impostor rounds. Actual cost $0.
+**Recorded 2026-10-02.** A second run of every model on every task, same settings, for the impostor rounds. Actual cost $0.
 
 | Model      | Code and agent passed, run 1 / run 2 | Rules met (open-ended), run 1 / run 2 | Tokens, run 1 / run 2 |
 | ---------- | ------------------------------------ | ------------------------------------- | --------------------- |
@@ -155,3 +170,30 @@ Requests refused with HTTP 503 appear to count against the daily quota: `gemini-
 - **A leak the tests caught.** That same run wrote the path of its working folder into a tool call, and the folder's name contained the harness's name. The blind view now replaces the folder name, and new runs use a neutral one. See DECISIONS.md.
 - **Two runs by one model can be word-for-word the same.** On some code tasks both of Opus's answers are identical, so an impostor round there shows the same letter twice. That is a fair clue, not a bug.
 - **Usage.** The 90 runs took about 9 minutes and did not reach a subscription usage limit.
+
+## 10. Three runs: totals, variance, and what holds
+
+**Recorded 2026-10-02, in three passes.** Actual cost $0; $1.84 at API rates for all 270 runs.
+
+| Model      | Code and agent passed, runs 1 / 2 / 3 | Rules met of 101, runs 1 / 2 / 3 | Tokens, runs 1 / 2 / 3      |
+| ---------- | ------------------------------------- | -------------------------------- | --------------------------- |
+| Haiku 4.5  | 9 / 9 / 9 of 10                       | 85 / 97 / 95                     | 117,632 / 125,961 / 119,794 |
+| Sonnet 5.5 | 10 / 10 / 10 of 10                    | 98 / 97 / 94                     | 66,442 / 66,539 / 66,540    |
+| Opus 5.5   | 10 / 10 / 10 of 10                    | 96 / 96 / 98                     | 67,024 / 64,684 / 66,773    |
+
+- **Which tasks moved.** Haiku: three explanation tasks, four tech-stack tasks, two writing tasks; the largest gap was 50 points, on `writing-04`. Sonnet: two explanation, two tech-stack, one writing. Opus: three explanation, one writing. `writing-01` moved for all three.
+- **Haiku fails `agent-01` every time, in two different ways.** In run 1 it answered wrongly. In runs 2 and 3 it ran into the 16,000-token cap without answering: the only two of 270 runs that did not end with an answer.
+- **Token use is steady.** Sonnet's three runs of the bank are within 100 tokens of each other; Opus's within 4%; Haiku's within 8%.
+- **What holds.** 223 of 270 runs passed their tests or met every rule; 47 did not. Of the 47, 30 are explanation tasks (Opus 12, Sonnet 10, Haiku 8), 10 tech-stack (Haiku 7, Sonnet 3), 4 writing, and 3 are Haiku on `agent-01`. Opus misses a rule on explanation tasks more often than Haiku does.
+- **Usage.** Each recording of 90 runs took about 9 minutes and none reached a subscription usage limit.
+
+## 11. A health check that looked like an escaped process
+
+**Found 2026-10-02.** One sandbox test failed once in a full test run and passed when re-run.
+
+- **Not what it looked like.** The test checks the Mermaid parser, so a timeout under load was the obvious guess. The suite then passed 10 of 10 while the web and API suites ran beside it.
+- **The saved output had the answer.** The assertion that failed was "no process is left behind", and what was left was one unexpected process id.
+- **Cause.** Docker runs the container's health check by starting a process inside it every five seconds, as the sandbox's own user. The sandbox's check for processes left behind by executed code counted it. Calling the check in a loop for 22 seconds found a stray in 8,048 of 257,809 calls, 3.1%.
+- **It was not only a test problem.** The live sandbox kills what it takes for strays, so it had been killing its own health check about 3% of the time.
+- **Fix.** A process started from outside the container has a parent the container cannot see. The check now recognises those and leaves them alone. Code the sandbox runs cannot get such a parent. After the fix: 0 strays in 161,210 calls.
+- **A second fault found on the way.** A Mermaid parser that timed out was reported as "the diagram is invalid". On a slow machine that would have scored a valid diagram as failing, with nothing to show it. It is now an error, and the run is left unscored and re-run. No recorded run was affected.

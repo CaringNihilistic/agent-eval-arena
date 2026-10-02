@@ -36,7 +36,7 @@ export interface RunHeader {
   display_name: string;
   model: string;
   task_id: string;
-  /** 1 for the first run of a model on a task, 2 for the second (trap material). */
+  /** Which run of this model on this task: 1, 2, 3. Every run uses the same settings. */
   take: number;
   category: Category;
   stop_reason: StopReason;
@@ -200,7 +200,6 @@ export interface BlindLetter {
   seat: Seat;
   guest: GuestId;
   steps: number;
-  /** Null in a timetable round, which pauses before the answer. */
   final_answer: string | null;
   events: TraceEvent[];
 }
@@ -251,12 +250,23 @@ export interface BlindRound {
   game: GameState | null;
 }
 
+/** A figure measured once per run of the whole bank: its mean, and how far it moved between runs. */
+export interface Spread {
+  mean: number;
+  min: number;
+  max: number;
+}
+
+/** One model's totals over the 30 tasks, across every recorded run of them. */
 export interface ModelTotals {
-  runs: number;
-  scored_runs: number;
-  passes: number;
-  checks_met: number;
+  /** How many times the bank was run (takes). */
+  takes: number;
+  /** Tasks with a right answer, and how many of them each run passed. */
+  scored_tasks: number;
+  passes: Spread;
+  /** Constraint checks on the open-ended tasks, and how many each run met. */
   checks_total: number;
+  checks_met: Spread;
   mean_answer_words: number;
   mean_reference_cost_usd: number;
 }

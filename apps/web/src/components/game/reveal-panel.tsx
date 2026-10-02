@@ -4,6 +4,7 @@ import { LetterCard } from "@/components/game/letter-card";
 import { OfficialBenchmarksPanel } from "@/components/game/official-panel";
 import { Panel, Title } from "@/components/theme/ornament";
 import { CROWD_MIN } from "@/lib/casebook";
+import { acrossRuns, rangeText } from "@/lib/format";
 import { guest as guestById } from "@/lib/guests";
 import {
   CONFIDENCE_LABELS,
@@ -43,12 +44,10 @@ export function answerText(answer: Answer, authors: readonly AuthorOption[]): st
 
 /** The verdict on the answer, where there is one. */
 export function verdictText(round: RevealedRound): string {
-  const { your_answer: answer, outcome, trap, kind } = round;
+  const { your_answer: answer, outcome, trap } = round;
   if (answer.type === "accuse") {
     if (outcome === "right") return "Quite right. One hand wrote both.";
-    return kind === "ranking"
-      ? "A false accusation: all three authors were at the table."
-      : "A false accusation: two different authors wrote these.";
+    return "A false accusation: two different authors wrote these.";
   }
   if (trap) return "You were fooled: one author wrote both letters.";
   if (outcome === "right") return "Quite right.";
@@ -111,10 +110,10 @@ function Unmasking({
         {usd(letter.cost_usd)} actual)
       </p>
       <p className="text-xs text-muted-foreground">
-        This author over all 30 tasks: passed {totals.passes} of {totals.scored_runs} with a right
-        answer, met {totals.checks_met} of {totals.checks_total} rules, about{" "}
-        {Math.round(totals.mean_answer_words)} words and {usd(totals.mean_reference_cost_usd)} a
-        letter.
+        This author over all 30 tasks, {acrossRuns(totals.takes)}: passed {rangeText(totals.passes)}{" "}
+        of {totals.scored_tasks} with a right answer, met {rangeText(totals.checks_met)} of{" "}
+        {totals.checks_total} rules, about {Math.round(totals.mean_answer_words)} words and{" "}
+        {usd(totals.mean_reference_cost_usd)} a letter.
       </p>
     </section>
   );

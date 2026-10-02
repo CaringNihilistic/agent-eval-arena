@@ -15,6 +15,7 @@ import signal
 import sys
 import tempfile
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -119,19 +120,57 @@ def _is_live(entry: Path) -> bool:
     return state != "Z"
 
 
+def _parents() -> dict[int, int]:
+    """Every process the container can see, mapped to its parent's pid."""
+    parents = {}
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat = (entry / "stat").read_text()
+        except OSError:
+            continue
+        parents[int(entry.name)] = int(stat.rsplit(")", 1)[1].split()[1])
+    return parents
+
+
+def is_injected(pid: int, parents: Mapping[int, int]) -> bool:
+    """True for a process put into the container from outside, or descended from one.
+
+    Docker's health check and `docker exec` start a process whose parent is outside
+    the container, which shows here as parent pid 0. Only the container's init
+    (pid 1) and such processes have that. Code the sandbox runs cannot: its
+    processes descend from this service, and an orphan is adopted by init. So a
+    chain of parents that ends at a pid other than 1 was not left by executed code.
+    """
+    seen: set[int] = set()
+    while pid in parents and pid not in seen:
+        seen.add(pid)
+        parent = parents[pid]
+        if parent == 0:
+            return pid != 1
+        pid = parent
+    # The chain broke because a process exited mid-scan. Unknown is treated as a stray.
+    return False
+
+
 def stray_processes() -> list[int]:
-    """Live processes owned by this user that are not this service or an ancestor of it."""
+    """Live processes owned by this user that executed code could have left behind:
+    not this service, not an ancestor of it, and not started from outside the
+    container (the Docker health check runs here every few seconds)."""
     keep = _ancestors()
     uid = os.getuid()
+    parents = _parents()
     strays = []
     for entry in Path("/proc").iterdir():
         if not entry.name.isdigit() or int(entry.name) in keep:
             continue
         try:
-            if entry.stat().st_uid == uid and _is_live(entry):
-                strays.append(int(entry.name))
+            owned_and_live = entry.stat().st_uid == uid and _is_live(entry)
         except OSError:
             continue
+        if owned_and_live and not is_injected(int(entry.name), parents):
+            strays.append(int(entry.name))
     return strays
 
 
@@ -226,6 +265,11 @@ class MermaidVerdict:
     error: str | None
 
 
+class MermaidUnavailableError(Exception):
+    """The parser did not give a verdict: it timed out or crashed. This says
+    nothing about the diagram, so it must never be reported as "invalid"."""
+
+
 async def parse_mermaid(code: str) -> MermaidVerdict:
     """Run the real Mermaid parser on diagram text.
 
@@ -248,14 +292,14 @@ async def parse_mermaid(code: str) -> MermaidVerdict:
             stdout, _stderr = await asyncio.wait_for(
                 started.communicate(code.encode("utf-8")), timeout=MERMAID_TIMEOUT_S
             )
-        except TimeoutError:
+        except TimeoutError as error:
             _kill_group(started.pid)
             await started.wait()
-            return MermaidVerdict(False, "The parser did not finish in time.")
+            raise MermaidUnavailableError("The parser did not finish in time.") from error
         finally:
             _reap_strays()
     try:
         verdict = json.loads(stdout.decode("utf-8"))
         return MermaidVerdict(bool(verdict["valid"]), verdict.get("error"))
-    except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
-        return MermaidVerdict(False, "The parser gave no verdict.")
+    except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as error:
+        raise MermaidUnavailableError("The parser gave no verdict.") from error

@@ -6,10 +6,7 @@ import {
   blindView,
   REDACTED_ERROR_MESSAGE,
   redactEvent,
-  hasVisibleWork,
-  pausedView,
   seatAlias,
-  SUBMIT_ANSWER,
   summarizeBlindSide,
 } from "@/lib/blind-view";
 import { findLeaks } from "@/test/leak-scan";
@@ -174,87 +171,6 @@ describe("redaction rules", () => {
   });
 });
 
-describe("a run paused before its final answer", () => {
-  // The fixture run, with a final step that submits the answer through the control tool.
-  const [firstCall] = only(leftRun.events, "llm_call");
-  const finished = only(leftRun.events, "run_finished")[0];
-  const submitting: TraceEvent[] = [
-    ...leftRun.events.filter((event) => event.seq < finished.seq),
-    {
-      ...firstCall,
-      seq: finished.seq,
-      payload: {
-        ...firstCall.payload,
-        step: 2,
-        output: {
-          content: "The total is 179.45.",
-          thinking: null,
-          tool_calls: [{ call_id: "c2", tool: SUBMIT_ANSWER, arguments: { answer: "179.45" } }],
-          truncated: false,
-        },
-      },
-    },
-    {
-      ...finished,
-      seq: finished.seq + 1,
-      type: "tool_call",
-      payload: { step: 2, call_id: "c2", tool: SUBMIT_ANSWER, arguments: { answer: "179.45" } },
-    },
-    { ...finished, seq: finished.seq + 2 },
-  ];
-  const paused = pausedView(submitting, ALIAS);
-
-  it("removes the answer from the final reply, the submit call, and the last event", () => {
-    const calls = only(paused, "llm_call");
-    const last = calls[calls.length - 1];
-    const submit = only(paused, "tool_call").find((event) => event.payload.tool === SUBMIT_ANSWER);
-
-    expect(last.payload.output.content).toBeNull();
-    expect(last.payload.output.tool_calls[0].arguments).toEqual({});
-    expect(submit?.payload.arguments).toEqual({});
-    expect(only(paused, "run_finished")[0].payload.final_answer).toBeNull();
-    // 179.45 is also the calculator's output, which the player is meant to see.
-    expect(JSON.stringify(paused)).not.toContain("The total is 179.45");
-    expect(JSON.stringify(paused)).not.toContain('"answer"');
-  });
-
-  it("keeps the work done before the answer", () => {
-    const [first] = only(paused, "llm_call");
-    const [work] = only(paused, "tool_call");
-
-    expect(first.payload.output.content).toBe("I will compute it.");
-    expect(work.payload.tool).toBe("calculator");
-    expect(work.payload.arguments).toEqual({ expression: "37*4.85" });
-  });
-
-  it("is still blind in every other respect", () => {
-    expect(findLeaks(paused, secrets)).toEqual([]);
-  });
-
-  it("hides a plain-text answer given without the submit tool", () => {
-    const plain = pausedView(
-      [
-        {
-          ...firstCall,
-          payload: {
-            ...firstCall.payload,
-            output: {
-              content: "Dear Sir, the answer.",
-              thinking: null,
-              tool_calls: [],
-              truncated: false,
-            },
-          },
-        },
-        finished,
-      ],
-      ALIAS,
-    );
-
-    expect(JSON.stringify(plain)).not.toContain("Dear Sir");
-  });
-});
-
 describe("the agent's working folder", () => {
   it("has its name, which names the harness, replaced wherever an agent wrote it", () => {
     const [call] = only(leftRun.events, "tool_call");
@@ -271,20 +187,6 @@ describe("the agent's working folder", () => {
     expect(blind).toContain("/tmp/workdir/sensor_readings.csv");
     // The stored trace is untouched.
     expect(JSON.stringify(events)).toContain("arena-claude-6dnni_hc");
-  });
-});
-
-describe("visible work", () => {
-  it("is a tool call other than the submission", () => {
-    const [call] = only(leftRun.events, "tool_call");
-    const submit: TraceEvent = {
-      ...call,
-      payload: { ...call.payload, tool: SUBMIT_ANSWER, arguments: { answer: "x" } },
-    };
-
-    expect(hasVisibleWork(leftRun.events)).toBe(true);
-    expect(hasVisibleWork([submit])).toBe(false);
-    expect(hasVisibleWork([])).toBe(false);
   });
 });
 
