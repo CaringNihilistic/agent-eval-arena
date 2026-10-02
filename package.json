@@ -17,7 +17,8 @@
     "test:web": "pnpm --filter web test",
     "test:api": "node scripts/py.mjs api pytest && node scripts/py.mjs sandbox pytest",
     "schema:gen": "pnpm --filter @arena/schema gen && node scripts/py.mjs api python scripts/gen_schema.py",
-    "schema:check": "pnpm --filter @arena/schema check && node scripts/py.mjs api python scripts/gen_schema.py --check"
+    "schema:check": "pnpm --filter @arena/schema check && node scripts/py.mjs api python scripts/gen_schema.py --check",
+    "test:e2e": "docker compose up -d --wait db && pnpm --filter web e2e"
   },
   "devDependencies": {
     "prettier": "^3"

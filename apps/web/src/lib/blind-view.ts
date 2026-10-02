@@ -7,8 +7,6 @@
 
 import type { TraceEvent } from "@arena/schema";
 
-export type MatchSide = "left" | "right";
-
 /**
  * Stop reasons that reveal how much of its budget, or how long, a run took.
  * A voter still sees that the run ended without an answer.
@@ -25,22 +23,21 @@ export const REDACTED_ERROR_MESSAGE = "The run hit an error.";
 export const BLIND_TIMESTAMP = "1970-01-01T00:00:00+00:00";
 
 /** What replaces a run id, so the unblinded run cannot be looked up. */
-export function sideAlias(matchId: string, side: MatchSide): string {
-  return `${matchId}:${side}`;
+export function seatAlias(roundId: string, seat: string): string {
+  return `${roundId}:${seat}`;
 }
+
+/** The control tool an agent ends its run with. Its argument is the final answer. */
+export const SUBMIT_ANSWER = "submit_answer";
 
 /**
  * One event as a voter who has not voted may see it, or null if the event
  * must not be sent at all.
  */
-export function redactEvent(
-  event: TraceEvent,
-  matchId: string,
-  side: MatchSide,
-): TraceEvent | null {
+export function redactEvent(event: TraceEvent, alias: string): TraceEvent | null {
   const envelope = {
-    run_id: sideAlias(matchId, side),
-    side,
+    run_id: alias,
+    side: null,
     redacted: true,
     timestamp: BLIND_TIMESTAMP,
   };
@@ -120,15 +117,68 @@ export function redactEvent(
   }
 }
 
+/**
+ * The agent's private working folder. Its name carries the harness's name, and
+ * an agent that reads a file by its full path writes that name into the trace.
+ */
+const WORKING_FOLDER = /arena-claude-[A-Za-z0-9_]+/g;
+export const BLIND_WORKING_FOLDER = "workdir";
+
+/** A copy of `value` with the working folder's name replaced in every string. */
+function withoutWorkingFolder<T>(value: T): T {
+  if (typeof value === "string") {
+    return value.replace(WORKING_FOLDER, BLIND_WORKING_FOLDER) as T;
+  }
+  if (Array.isArray(value)) return value.map(withoutWorkingFolder) as T;
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, withoutWorkingFolder(item)]),
+    ) as T;
+  }
+  return value;
+}
+
 /** A run's events as a voter who has not voted may see them. */
-export function blindView(
-  events: readonly TraceEvent[],
-  matchId: string,
-  side: MatchSide,
-): TraceEvent[] {
+export function blindView(events: readonly TraceEvent[], alias: string): TraceEvent[] {
   return events
-    .map((event) => redactEvent(event, matchId, side))
-    .filter((event): event is TraceEvent => event !== null);
+    .map((event) => redactEvent(event, alias))
+    .filter((event): event is TraceEvent => event !== null)
+    .map((event) => ({ ...event, payload: withoutWorkingFolder(event.payload) }) as TraceEvent);
+}
+
+/**
+ * The blind view of a run paused before its final answer, for a timetable
+ * round. On top of the usual redaction, the answer is removed from the three
+ * places it appears: the final model reply, the argument of the submit call,
+ * and the run's last event.
+ */
+export function pausedView(events: readonly TraceEvent[], alias: string): TraceEvent[] {
+  const blind = blindView(events, alias);
+  const lastCall = blind.findLastIndex((event) => event.type === "llm_call");
+  return blind.map((event, index): TraceEvent => {
+    if (event.type === "llm_call" && index === lastCall) {
+      return {
+        ...event,
+        payload: {
+          ...event.payload,
+          output: {
+            ...event.payload.output,
+            content: null,
+            tool_calls: event.payload.output.tool_calls.map((call) =>
+              call.tool === SUBMIT_ANSWER ? { ...call, arguments: {} } : call,
+            ),
+          },
+        },
+      };
+    }
+    if (event.type === "tool_call" && event.payload.tool === SUBMIT_ANSWER) {
+      return { ...event, payload: { ...event.payload, arguments: {} } };
+    }
+    if (event.type === "run_finished") {
+      return { ...event, payload: { ...event.payload, final_answer: null } };
+    }
+    return event;
+  });
 }
 
 export interface BlindSideSummary {
@@ -137,7 +187,7 @@ export interface BlindSideSummary {
   final_answer: string | null;
 }
 
-/** The only figures shown beside a trace before the vote: the step count and the answer. */
+/** The only figures shown beside a trace before the decision: the step count and the answer. */
 export function summarizeBlindSide(events: readonly TraceEvent[]): BlindSideSummary {
   let steps = 0;
   for (const event of events) {
@@ -155,19 +205,7 @@ export function summarizeBlindSide(events: readonly TraceEvent[]): BlindSideSumm
   return { finished: false, steps, final_answer: null };
 }
 
-export interface BlindSide {
-  summary: BlindSideSummary;
-  events: TraceEvent[];
-}
-
-/** Both runs of a match as a voter who has not voted may see them. */
-export function blindSides(
-  matchId: string,
-  runs: Record<MatchSide, readonly TraceEvent[]>,
-): Record<MatchSide, BlindSide> {
-  const side = (name: MatchSide): BlindSide => {
-    const events = blindView(runs[name], matchId, name);
-    return { summary: summarizeBlindSide(events), events };
-  };
-  return { left: side("left"), right: side("right") };
+/** Did the run do anything a player can watch before its answer: a tool call that is not the submission. */
+export function hasVisibleWork(events: readonly TraceEvent[]): boolean {
+  return events.some((event) => event.type === "tool_call" && event.payload.tool !== SUBMIT_ANSWER);
 }

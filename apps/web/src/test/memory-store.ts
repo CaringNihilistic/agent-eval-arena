@@ -1,50 +1,77 @@
-// An in-memory vote store for tests. It keeps the same rules as the Postgres one:
-// one vote per voter per match, and counters that only ever go up.
+// An in-memory store for tests. It keeps the same rules as the Postgres one:
+// one decision per player per round, counters that only go up, one share id per
+// player, one challenge per player per seed.
 
-import type { VoteRecord } from "@/lib/types";
-import type { NewVote, VoteStore } from "@/server/store";
+import type { DecisionRecord } from "@/lib/types";
+import type { Challenge, NewDecision, Store } from "@/server/store";
 
-export interface MemoryStore extends VoteStore {
-  votes: (NewVote & { created_at: string })[];
+export interface MemoryStore extends Store {
+  rows: (DecisionRecord & { ip_hash: string })[];
   counters: Map<string, number>;
 }
 
 export function memoryStore(): MemoryStore {
-  const votes: MemoryStore["votes"] = [];
+  const rows: MemoryStore["rows"] = [];
   const counters = new Map<string, number>();
+  const shares = new Map<string, string>();
+  const challenges: Challenge[] = [];
+  const strip = (row: MemoryStore["rows"][number]): DecisionRecord => {
+    const copy: Partial<typeof row> = { ...row };
+    delete copy.ip_hash;
+    return copy as DecisionRecord;
+  };
   return {
-    votes,
+    rows,
     counters,
-    async voteOn(matchId, voterId) {
-      return (
-        votes.find((vote) => vote.match_id === matchId && vote.voter_id === voterId)?.choice ?? null
-      );
+    async decisionOn(roundId, voterId) {
+      const row = rows.find((item) => item.round_id === roundId && item.voter_id === voterId);
+      return row ? strip(row) : null;
     },
-    async votedMatchIds(voterId) {
-      return new Set(votes.filter((vote) => vote.voter_id === voterId).map((v) => v.match_id));
+    async decisionsBy(voterId) {
+      return rows.filter((row) => row.voter_id === voterId).map(strip);
     },
-    async insertVote(vote) {
-      if (votes.some((v) => v.match_id === vote.match_id && v.voter_id === vote.voter_id)) {
+    async insertDecision(decision: NewDecision) {
+      if (
+        rows.some((row) => row.round_id === decision.round_id && row.voter_id === decision.voter_id)
+      ) {
         return false;
       }
-      votes.push({ ...vote, created_at: new Date(1_790_000_000_000 + votes.length).toISOString() });
+      rows.push({
+        ...decision,
+        created_at: new Date(1_790_000_000_000 + rows.length * 1000).toISOString(),
+      });
       return true;
     },
-    async allVotes() {
-      return votes.map((stored) => {
-        const vote: Partial<typeof stored> = { ...stored };
-        delete vote.ip_hash;
-        return vote as VoteRecord;
-      });
+    async allDecisions() {
+      return rows.map(strip);
     },
-    async votesOn(matchId) {
-      return votes.filter((vote) => vote.match_id === matchId).map((vote) => vote.choice);
+    async decisionsOnContent(contentKey) {
+      return rows.filter((row) => row.content_key === contentKey).map(strip);
     },
     async hit(bucket, windowStart) {
       const key = `${bucket}@${windowStart.toISOString()}`;
       const count = (counters.get(key) ?? 0) + 1;
       counters.set(key, count);
       return count;
+    },
+    async shareIdFor(voterId) {
+      for (const [shareId, owner] of shares) if (owner === voterId) return shareId;
+      const shareId = `share-${shares.size + 1}`;
+      shares.set(shareId, voterId);
+      return shareId;
+    },
+    async voterForShare(shareId) {
+      return shares.get(shareId) ?? null;
+    },
+    async createChallenge(seed, voterId) {
+      const existing = challenges.find((item) => item.seed === seed && item.voter_id === voterId);
+      if (existing) return existing.id;
+      const id = `challenge-${challenges.length + 1}`;
+      challenges.push({ id, seed, voter_id: voterId });
+      return id;
+    },
+    async challenge(id) {
+      return challenges.find((item) => item.id === id) ?? null;
     },
   };
 }

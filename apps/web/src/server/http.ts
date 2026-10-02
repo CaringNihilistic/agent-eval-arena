@@ -1,6 +1,6 @@
 // Shared pieces of the route handlers.
 
-import { ServiceError } from "@/server/match-service";
+import { ServiceError } from "@/server/round-service";
 import { StoreNotConfiguredError } from "@/server/store";
 
 /** The caller's address as the proxy reports it. Used only as a keyed hash. */

@@ -420,7 +420,7 @@ class AgentSdkBackend:
             session.handler(SUBMIT_ANSWER),
         )
 
-        workdir = Path(tempfile.mkdtemp(prefix="arena-claude-"))
+        workdir = Path(tempfile.mkdtemp(prefix="arena-run-"))
         spec = _Spec(
             system_prompt=ctx.config.system_prompt,
             model=ctx.config.model,

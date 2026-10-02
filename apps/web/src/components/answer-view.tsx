@@ -40,9 +40,9 @@ export function Markdown({ text }: { text: string }) {
           ),
           // Tasks often ask for one item per line, so a single line break is kept.
           p: ({ children }) => <p className="whitespace-pre-line">{children}</p>,
-          h1: ({ children }) => <h3 className="text-base font-semibold">{children}</h3>,
-          h2: ({ children }) => <h3 className="text-base font-semibold">{children}</h3>,
-          h3: ({ children }) => <h4 className="text-sm font-semibold">{children}</h4>,
+          h1: ({ children }) => <h3 className="text-base font-bold">{children}</h3>,
+          h2: ({ children }) => <h3 className="text-base font-bold">{children}</h3>,
+          h3: ({ children }) => <h4 className="text-sm font-bold">{children}</h4>,
           ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
           table: ({ children }) => (
@@ -58,12 +58,14 @@ export function Markdown({ text }: { text: string }) {
             if (className === "language-mermaid") return <MermaidDiagram code={code.trim()} />;
             if (className || code.includes("\n")) {
               return (
-                <pre className="overflow-x-auto rounded-md border bg-muted p-3 font-mono text-xs">
+                <pre className="overflow-x-auto border border-border bg-muted p-3 font-mono text-xs not-italic">
                   <code>{code.replace(/\n$/, "")}</code>
                 </pre>
               );
             }
-            return <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{code}</code>;
+            return (
+              <code className="bg-muted px-1 py-0.5 font-mono text-xs not-italic">{code}</code>
+            );
           },
         }}
       >
@@ -84,7 +86,7 @@ export function AnswerView({ answer, category }: { answer: string | null; catego
   }
   if (category === "code" && !answer.includes("```")) {
     return (
-      <pre className="overflow-x-auto rounded-md border bg-muted p-3 font-mono text-xs">
+      <pre className="overflow-x-auto border border-border bg-muted p-3 font-mono text-xs not-italic">
         <code>{answer}</code>
       </pre>
     );

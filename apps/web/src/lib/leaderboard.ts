@@ -1,32 +1,101 @@
-// Everything the leaderboard page shows, computed from the recorded runs, the
-// vote log, and Anthropic's published benchmark scores. The only implementation
-// of each statistic in the project.
+// Everything "The Official Record" shows, computed from the recorded runs, the
+// decision log, and Anthropic's published benchmark scores. The only
+// implementation of each statistic in the project.
 
-import { eloTable, type EloRow } from "@/lib/elo";
+import { eloTable, type EloRow, type EloVote } from "@/lib/elo";
+import { GUEST_IDS, type GuestId } from "@/lib/guests";
 import { mean, rankDescending, wilson, type Interval } from "@/lib/stats";
-import type { Category, OfficialBenchmarks, RunHeader, VoteRecord } from "@/lib/types";
+import type {
+  Category,
+  DecisionRecord,
+  LetterRecord,
+  Mode,
+  ModelTotals,
+  OfficialBenchmarks,
+  RunHeader,
+} from "@/lib/types";
 
-export interface ObjectiveRow {
+/** Modes whose preferences count toward Elo. */
+export const ELO_MODES: readonly Mode[] = ["drawing_room", "library"];
+/** Two-letter preference votes needed before costume and position bias are reported. */
+export const MIN_BIAS_VOTES = 30;
+
+export interface PairwiseResult extends EloVote {
+  mode: Mode;
+}
+
+/** A ranking as pairwise results: each letter beats every letter ranked below it. */
+export function rankingToPairwise(order: readonly string[]): { winner: string; loser: string }[] {
+  const pairs = [];
+  for (let i = 0; i < order.length; i += 1) {
+    for (let j = i + 1; j < order.length; j += 1) {
+      pairs.push({ winner: order[i], loser: order[j] });
+    }
+  }
+  return pairs;
+}
+
+function letterAt(decision: DecisionRecord, seat: string): LetterRecord | undefined {
+  return decision.letters.find((letter) => letter.seat === seat);
+}
+
+/**
+ * The preference results Elo is computed from: Drawing Room and Library only,
+ * never a trap round, never an accusation, in the order the decisions were made.
+ */
+export function eloVotes(decisions: readonly DecisionRecord[]): PairwiseResult[] {
+  const votes: PairwiseResult[] = [];
+  for (const decision of decisions) {
+    if (!ELO_MODES.includes(decision.mode) || decision.trap) continue;
+    const answer = decision.answer;
+    if (answer.type === "trust") {
+      const a = letterAt(decision, "A");
+      const b = letterAt(decision, "B");
+      if (!a || !b) continue;
+      const choice = { A: "left", B: "right", equal: "tie", neither: "both_bad" } as const;
+      votes.push({
+        left: a.config_id,
+        right: b.config_id,
+        choice: choice[answer.choice],
+        mode: decision.mode,
+      });
+    } else if (answer.type === "ranking") {
+      const configs = answer.order.map((seat) => letterAt(decision, seat)?.config_id);
+      if (configs.some((config) => config === undefined)) continue;
+      for (const pair of rankingToPairwise(configs as string[])) {
+        votes.push({ left: pair.winner, right: pair.loser, choice: "left", mode: decision.mode });
+      }
+    }
+  }
+  return votes;
+}
+
+export interface ObjectiveRow extends ModelTotals {
   config: string;
-  runs: number;
-  /** Runs on tasks with a right answer (code and agent). */
-  scored_runs: number;
-  passes: number;
   pass_rate: number | null;
   pass_ci: Interval | null;
-  /** Runs on open-ended tasks, scored by constraint checks. */
-  constraint_runs: number;
-  checks_met: number;
-  checks_total: number;
   /** Share of stated limits respected. Not a measure of quality. */
   constraints_met_rate: number | null;
   /** Pass counts 1, fail 0, an open-ended run the share of its checks met. */
   mean_score: number | null;
-  mean_answer_words: number | null;
-  mean_reference_cost_usd: number | null;
   mean_steps: number | null;
   mean_latency_ms: number | null;
-  passes_per_reference_dollar: number | null;
+}
+
+/** One model's totals over its first run of each task. */
+export function modelTotals(runs: readonly RunHeader[], config: string): ModelTotals {
+  const mine = runs.filter((run) => run.config_id === config && run.take === 1);
+  const scored = mine.filter((run) => run.passed !== null);
+  const open = mine.filter((run) => run.scorer_type === "constraints");
+  return {
+    runs: mine.length,
+    scored_runs: scored.length,
+    passes: scored.filter((run) => run.passed === true).length,
+    checks_met: open.reduce((sum, run) => sum + run.checks_met, 0),
+    checks_total: open.reduce((sum, run) => sum + run.checks_total, 0),
+    mean_answer_words: mean(mine.map((run) => run.answer_words)) ?? 0,
+    mean_reference_cost_usd: mean(mine.map((run) => run.reference_cost_usd)) ?? 0,
+  };
 }
 
 export function objectiveTable(
@@ -34,76 +103,65 @@ export function objectiveTable(
   configs: readonly string[],
 ): ObjectiveRow[] {
   return configs.map((config) => {
-    const mine = runs.filter((run) => run.config_id === config);
-    const scored = mine.filter((run) => run.passed !== null);
-    const open = mine.filter((run) => run.scorer_type === "constraints");
-    const passes = scored.filter((run) => run.passed === true).length;
-    const checksMet = open.reduce((sum, run) => sum + run.checks_met, 0);
-    const checksTotal = open.reduce((sum, run) => sum + run.checks_total, 0);
-    const scoredCost = scored.reduce((sum, run) => sum + run.reference_cost_usd, 0);
+    const mine = runs.filter((run) => run.config_id === config && run.take === 1);
+    const totals = modelTotals(runs, config);
     return {
       config,
-      runs: mine.length,
-      scored_runs: scored.length,
-      passes,
-      pass_rate: scored.length > 0 ? passes / scored.length : null,
-      pass_ci: wilson(passes, scored.length),
-      constraint_runs: open.length,
-      checks_met: checksMet,
-      checks_total: checksTotal,
-      constraints_met_rate: checksTotal > 0 ? checksMet / checksTotal : null,
+      ...totals,
+      pass_rate: totals.scored_runs > 0 ? totals.passes / totals.scored_runs : null,
+      pass_ci: wilson(totals.passes, totals.scored_runs),
+      constraints_met_rate:
+        totals.checks_total > 0 ? totals.checks_met / totals.checks_total : null,
       mean_score: mean(mine.map((run) => run.score)),
-      mean_answer_words: mean(mine.map((run) => run.answer_words)),
-      mean_reference_cost_usd: mean(mine.map((run) => run.reference_cost_usd)),
       mean_steps: mean(mine.map((run) => run.steps)),
       mean_latency_ms: mean(mine.map((run) => run.latency_ms)),
-      passes_per_reference_dollar: scoredCost > 0 ? passes / scoredCost : null,
     };
   });
 }
 
+/** Two-letter rounds where the player trusted one letter over the other. */
+function sidedDuels(decisions: readonly DecisionRecord[]): DecisionRecord[] {
+  return decisions.filter(
+    (decision) =>
+      decision.kind === "duel" &&
+      decision.answer.type === "trust" &&
+      (decision.answer.choice === "A" || decision.answer.choice === "B"),
+  );
+}
+
+function trustedSeat(decision: DecisionRecord): string | null {
+  return decision.answer.type === "trust" ? decision.answer.choice : null;
+}
+
 export interface AgreementStat {
-  /** Votes on code and agent matches where exactly one side passed. */
+  /** Votes on code and agent rounds where exactly one side passed. */
   decisive_votes: number;
   agreeing_votes: number;
   agreement_rate: number | null;
   ci: Interval | null;
-  /** How people voted in each scorer outcome. */
-  table: {
-    one_passed: { picked_passing: number; picked_failing: number; tie: number; both_bad: number };
-    both_passed: { left: number; right: number; tie: number; both_bad: number };
-    both_failed: { left: number; right: number; tie: number; both_bad: number };
-  };
 }
 
 /**
- * Do voters pick the side the scorer passed? Only tasks with a right answer
- * count. A tie or "both bad" on a decisive match counts as disagreement.
+ * Do players trust the letter the scorer passed? Only Elo-eligible duels on
+ * tasks with a right answer count. "Equally good" or "Neither" on a decisive
+ * round counts as disagreement.
  */
-export function agreement(votes: readonly VoteRecord[]): AgreementStat {
-  const table: AgreementStat["table"] = {
-    one_passed: { picked_passing: 0, picked_failing: 0, tie: 0, both_bad: 0 },
-    both_passed: { left: 0, right: 0, tie: 0, both_bad: 0 },
-    both_failed: { left: 0, right: 0, tie: 0, both_bad: 0 },
-  };
-  for (const vote of votes) {
-    if (vote.left_passed === null || vote.right_passed === null) continue;
-    if (vote.left_passed === vote.right_passed) {
-      table[vote.left_passed ? "both_passed" : "both_failed"][vote.choice] += 1;
-      continue;
-    }
-    const passing = vote.left_passed ? "left" : "right";
-    if (vote.choice === "tie" || vote.choice === "both_bad") table.one_passed[vote.choice] += 1;
-    else table.one_passed[vote.choice === passing ? "picked_passing" : "picked_failing"] += 1;
+export function agreement(decisions: readonly DecisionRecord[]): AgreementStat {
+  let decisive = 0;
+  let agreeing = 0;
+  for (const decision of decisions) {
+    if (decision.kind !== "duel" || decision.trap || decision.answer.type !== "trust") continue;
+    if (!ELO_MODES.includes(decision.mode)) continue;
+    const [a, b] = [letterAt(decision, "A"), letterAt(decision, "B")];
+    if (!a || !b || a.passed === null || b.passed === null || a.passed === b.passed) continue;
+    decisive += 1;
+    if (decision.answer.choice === (a.passed ? "A" : "B")) agreeing += 1;
   }
-  const row = table.one_passed;
-  const decisive = row.picked_passing + row.picked_failing + row.tie + row.both_bad;
   return {
     decisive_votes: decisive,
-    agreeing_votes: row.picked_passing,
-    agreement_rate: decisive > 0 ? row.picked_passing / decisive : null,
-    ci: wilson(row.picked_passing, decisive),
-    table,
+    agreeing_votes: agreeing,
+    agreement_rate: decisive > 0 ? agreeing / decisive : null,
+    ci: wilson(agreeing, decisive),
   };
 }
 
@@ -118,37 +176,61 @@ function pickRate(picks: number, votes: number): PickRate {
   return { votes, picks, rate: votes > 0 ? picks / votes : null, ci: wilson(picks, votes) };
 }
 
-/** Share of left-or-right votes that picked the left pane. 50% means no position bias. */
-export function positionBias(votes: readonly VoteRecord[]): PickRate {
-  const sided = votes.filter((vote) => vote.choice === "left" || vote.choice === "right");
-  return pickRate(sided.filter((vote) => vote.choice === "left").length, sided.length);
+/** Share of sided votes that trusted the first letter shown. 50% means no position bias. */
+export function positionBias(decisions: readonly DecisionRecord[]): PickRate {
+  const sided = sidedDuels(decisions);
+  const first = sided.filter(
+    (decision) => letterAt(decision, trustedSeat(decision) ?? "")?.position === 0,
+  );
+  return pickRate(first.length, sided.length);
+}
+
+export interface CostumeRow extends PickRate {
+  guest: GuestId;
+}
+
+/**
+ * For each guest: of the sided two-letter votes that guest sat in, how often
+ * was the guest's letter the one trusted? Guests are assigned at random, so
+ * every rate should sit near 50% unless the costume itself sways players.
+ */
+export function costumeBias(decisions: readonly DecisionRecord[]): CostumeRow[] {
+  const sided = sidedDuels(decisions);
+  return GUEST_IDS.map((guest) => {
+    const seated = sided.filter((decision) =>
+      decision.letters.some((letter) => letter.guest === guest),
+    );
+    const trusted = seated.filter(
+      (decision) => letterAt(decision, trustedSeat(decision) ?? "")?.guest === guest,
+    );
+    return { guest, ...pickRate(trusted.length, seated.length) };
+  });
 }
 
 export interface LengthBias {
-  /** Left-or-right votes on open-ended matches whose answers differ in length. */
+  /** Sided votes on open-ended duels between different authors whose letters differ in length. */
   overall: PickRate;
-  by_category: Partial<Record<Category, PickRate>>;
-  /** Open-ended votes left out: ties, "both bad", and equal-length pairs. */
+  /** Open-ended duel votes left out: "equally good", "neither", and equal-length pairs. */
   excluded: number;
 }
 
-/** On open-ended tasks, how often did the longer answer win? 50% means no bias. */
-export function lengthBias(votes: readonly VoteRecord[]): LengthBias {
-  const open = votes.filter((vote) => vote.open_ended);
-  const usable = open.filter(
-    (vote) =>
-      (vote.choice === "left" || vote.choice === "right") &&
-      vote.left_answer_words !== vote.right_answer_words,
+/** On open-ended tasks, how often was the longer letter trusted? 50% means no bias. */
+export function lengthBias(decisions: readonly DecisionRecord[]): LengthBias {
+  const open = decisions.filter(
+    (d) => d.kind === "duel" && d.open_ended && !d.trap && d.answer.type === "trust",
   );
-  const pickedLonger = (vote: VoteRecord) =>
-    (vote.choice === "left") === vote.left_answer_words > vote.right_answer_words;
-  const rate = (subset: readonly VoteRecord[]) =>
-    pickRate(subset.filter(pickedLonger).length, subset.length);
-  const byCategory: Partial<Record<Category, PickRate>> = {};
-  for (const category of new Set(usable.map((vote) => vote.task_category))) {
-    byCategory[category] = rate(usable.filter((vote) => vote.task_category === category));
-  }
-  return { overall: rate(usable), by_category: byCategory, excluded: open.length - usable.length };
+  const usable = sidedDuels(open).filter((decision) => {
+    const [a, b] = [letterAt(decision, "A"), letterAt(decision, "B")];
+    return a !== undefined && b !== undefined && a.answer_words !== b.answer_words;
+  });
+  const longer = usable.filter((decision) => {
+    const trusted = letterAt(decision, trustedSeat(decision) ?? "");
+    const other = decision.letters.find((letter) => letter !== trusted);
+    return (
+      trusted !== undefined && other !== undefined && trusted.answer_words > other.answer_words
+    );
+  });
+  return { overall: pickRate(longer.length, usable.length), excluded: open.length - usable.length };
 }
 
 export interface OfficialStanding {
@@ -213,14 +295,20 @@ export interface HeadlineRow {
 
 export interface Leaderboard {
   category: Category | null;
+  /** Pairwise preference results behind the Elo table, and how many came from each mode. */
   votes: number;
+  votes_by_mode: Partial<Record<Mode, number>>;
   headline: HeadlineRow[];
   preference: EloRow[];
   objective: ObjectiveRow[];
   official: OfficialStanding[];
   agreement: AgreementStat;
-  position_bias: PickRate;
   length_bias: LengthBias;
+  /** Null until there are enough sided two-letter votes to say anything. */
+  position_bias: PickRate | null;
+  costume_bias: CostumeRow[] | null;
+  bias_votes: number;
+  bias_votes_needed: number;
 }
 
 export interface ConfigInfo {
@@ -229,28 +317,23 @@ export interface ConfigInfo {
   model: string;
 }
 
-/** Build the whole leaderboard, optionally for one task category. */
+/** Build the whole record, optionally for one task category. */
 export function buildLeaderboard(
   runs: readonly RunHeader[],
-  votes: readonly VoteRecord[],
+  decisions: readonly DecisionRecord[],
   official: OfficialBenchmarks,
   configs: readonly ConfigInfo[],
   category: Category | null,
 ): Leaderboard {
-  const inCategory = <T>(items: readonly T[], of: (item: T) => Category) =>
-    category === null ? items : items.filter((item) => of(item) === category);
-  const myRuns = inCategory(runs, (run) => run.category);
-  const myVotes = inCategory(votes, (vote) => vote.task_category);
+  const myRuns = category === null ? runs : runs.filter((run) => run.category === category);
+  const mine =
+    category === null ? decisions : decisions.filter((d) => d.task_category === category);
   const ids = configs.map((config) => config.id);
 
-  const preference = eloTable(
-    myVotes.map((vote) => ({
-      left: vote.left_config_id,
-      right: vote.right_config_id,
-      choice: vote.choice,
-    })),
-    ids,
-  );
+  const votes = eloVotes(mine);
+  const byMode: Partial<Record<Mode, number>> = {};
+  for (const vote of votes) byMode[vote.mode] = (byMode[vote.mode] ?? 0) + 1;
+  const preference = eloTable(votes, ids);
   const objective = objectiveTable(myRuns, ids);
   const standings = officialRanking(
     official,
@@ -277,15 +360,21 @@ export function buildLeaderboard(
     };
   });
 
+  const biasVotes = sidedDuels(mine).length;
+  const enough = biasVotes >= MIN_BIAS_VOTES;
   return {
     category,
-    votes: myVotes.length,
+    votes: votes.length,
+    votes_by_mode: byMode,
     headline,
     preference,
     objective,
     official: standings,
-    agreement: agreement(myVotes),
-    position_bias: positionBias(myVotes),
-    length_bias: lengthBias(myVotes),
+    agreement: agreement(mine),
+    length_bias: lengthBias(mine),
+    position_bias: enough ? positionBias(mine) : null,
+    costume_bias: enough ? costumeBias(mine) : null,
+    bias_votes: biasVotes,
+    bias_votes_needed: MIN_BIAS_VOTES,
   };
 }

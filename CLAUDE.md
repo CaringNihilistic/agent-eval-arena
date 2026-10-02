@@ -1,6 +1,6 @@
 # Agent Eval Arena
 
-Side-by-side agent evaluation: three Claude models ran the same 30 tasks; a visitor sees two recorded runs side by side, votes blind, then sees the models, our measured results, and Anthropic's published benchmarks. Votes feed an Elo ranking shown next to the official-benchmark ranking and our scorer.
+An agent evaluation presented as a game. Three Claude models ran the same 30 tasks, twice. A player sees their answers as unsigned letters in the seats of six fictional guests, decides which to trust without knowing who wrote them, and then sees the authors, our measured results, and Anthropic's published benchmarks. Preferences feed an Elo ranking shown next to the official-benchmark ranking and our scorer.
 
 The project exists to show skill in agent evaluation and observability. Correct trace data, honest scoring, and reproducibility outrank visual polish.
 
@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current state: Checkpoint B complete. Three Claude configs, 90 runs recorded, replay site working locally. Next (not started, needs the owner's go): README results, deployment to Vercel and Neon, end-to-end test, polish. `docs/PLAN.md` Section 0 is the current design.** Update this line at the end of every checkpoint.
+**Current state: Checkpoint B2 complete. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 180 recorded runs, working locally in all five modes. Next (not started, needs the owner's go): README results, deployment to Vercel and Neon, proper guest illustrations. `docs/PLAN.md` Sections 0 and 0.1 are the current design.** Update this line at the end of every checkpoint.
 
 ## How we work
 
@@ -62,6 +62,8 @@ pnpm lint                              # eslint + prettier check + ruff + schema
 pnpm typecheck                         # tsc + mypy (api and sandbox)
 pnpm test:web                          # vitest
 pnpm test:api                          # pytest for api and sandbox, in their containers
+pnpm test:e2e                          # Playwright: builds the site, plays every mode in Edge, own database
+node scripts/make-guest-portraits.mjs  # redraw the built-in SVG portraits
 pnpm format                            # prettier + ruff format
 pnpm schema:gen                        # regenerate TS and Pydantic types from the JSON Schema
 pnpm schema:check                      # fail if generated types are stale
@@ -69,11 +71,12 @@ node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 docker compose exec api uv run arena list
 docker compose up -d --wait api sandbox                 # needed only to record or run agents
 docker compose exec api uv run arena record             # record every missing run; resumable; uses the subscription
-docker compose exec api uv run arena record --index-only   # rebuild runs-index, matches, tasks
+docker compose exec api uv run arena record --take 2    # the second run of each pair (trap material)
+docker compose exec api uv run arena record --index-only   # rebuild runs-index and tasks
 docker compose exec api uv run arena run --config claude-haiku-full --task dev-math-01   # uses the subscription
 ```
 
-Planned, not yet available: `pnpm test:e2e`. The Postgres store tests run only when `TEST_DATABASE_URL` is set (see `apps/web/src/server/store.pg.test.ts`).
+The Postgres store tests run only when `TEST_DATABASE_URL` is set (see `apps/web/src/server/store.pg.test.ts`).
 
 ## Where things are (backend)
 
@@ -87,10 +90,16 @@ Planned, not yet available: `pnpm test:e2e`. The Postgres store tests run only w
 - `apps/api/tests/recorded/`: responses real providers returned, used as regression fixtures. When a real run breaks, save the response there (`arena run --dump-raw`) and write the test from it.
 - `apps/sandbox/src/sandbox/executor.py`: sandboxed execution. Its tests are escape attempts and must run inside the sandbox container.
 - `apps/api/src/arena/recording.py`: the recorder and the index builder. The files it writes are the only run store.
-- `apps/web/src/lib/blind-view.ts`: the only redaction code. `apps/web/src/test/leak-scan.ts` is the check every blind response must pass; `match-service.test.ts` runs it over all 90 recorded matches.
-- `apps/web/src/server/`: `recordings.ts` reads `data/`, `store.ts` is the Postgres vote store, `match-service.ts` holds the match, vote, rate-limit, and reveal rules. Route handlers in `src/app/api/` only translate HTTP.
-- `apps/web/src/lib/`: `elo.ts`, `stats.ts`, `leaderboard.ts` are the only implementations of Elo, intervals, agreement, length bias, and the official ranking.
+- `apps/web/src/lib/blind-view.ts`: the only redaction code. `apps/web/src/test/leak-scan.ts` is the check every blind response must pass; `round-service.test.ts` runs it over every round of every mode built from the real recordings.
+- `apps/web/src/lib/rounds.ts`: how rounds are dealt: pairing, traps, difficulty, seeds, seats. `assignGuests` takes a count and a seed and must never be given a run or a model.
+- `apps/web/src/lib/scoring.ts`: points, ranks, distinctions, candles. `judge` sees the round's facts and the answer, never other players' votes.
+- `apps/web/src/lib/leaderboard.ts`, `elo.ts`, `stats.ts`, `casebook.ts`: the only implementations of Elo, intervals, agreement, length, position and costume bias, the official ranking, the Casebook, and taste compatibility.
+- `apps/web/src/server/`: `recordings.ts` reads `data/`, `store.ts` is the Postgres store (decisions, shares, challenges, counters), `round-service.ts` holds the rules for dealing, deciding, and revealing. Route handlers in `src/app/api/` only translate HTTP.
+- `apps/web/src/components/game/`: the table (`round-table.tsx`), letters, the verdict panel, the reveal, the Casebook, the Official Record. `components/theme/`: ornaments and portraits.
 - `apps/web/src/components/answer-view.tsx`, `mermaid-diagram.tsx`: the only places model output is rendered as markdown or as a diagram.
+- `apps/web/src/lib/guests.ts`, `apps/web/public/guests/<id>/<expression>.svg`: the six guests. A PNG with the same name replaces the SVG with no code change.
+- `apps/web/src/app/globals.css`: every colour, font, and ornament measure. `src/test/theme.test.ts` checks contrast and that no component holds a colour literal.
+- `apps/web/e2e/`: the Playwright test.
 - `data/official-benchmarks.json`: Anthropic's published scores. Copy from the official page, never from memory; keep the source URL and update `checked`.
 - `apps/api/src/arena/scoring.py`: the five scorers. `apps/api/tests/test_task_bank.py` re-derives every expected answer; a new task needs an entry there.
 - `configs/`, `tasks/`: agent configs, prompts, tasks, fixtures, corpus, checkers. `tasks/tools/make_fixtures.py` regenerates the fixtures.
@@ -113,14 +122,23 @@ Planned, not yet available: `pnpm test:e2e`. The Postgres store tests run only w
 - No placeholder logic or fake data in production paths. If something is stubbed, mark it `TODO(phase-N)` and mention it in the phase report.
 - Results in the README are measured numbers from recorded runs, never illustrative ones.
 
-### Blind voting
+### Fairness (the game's rules; these outrank everything else in the web app)
 
-- Before the vote the UI shows only the traces, the final answers, and the step count. Models, pass/fail, constraint checks, cost, tokens, thinking, and all timing are revealed together after the vote.
-- Until a voter has voted on a match, the server withholds config, model, system prompt, run id, token counts, cost, thinking blocks, latencies, real timestamps, and the `score_computed` event (PLAN Section 4.1). Redaction happens on the server, never in the browser.
-- Nothing shown before the vote may depend on recorded time. The blind replay uses one fixed pace.
-- Any new field that reveals the result, the cost, the speed, or the identity of a side must be added to the blind-view redaction and to `WITHHELD_KEYS` in the leak scan.
-- Every vote stores both sides' pass/fail state and answer lengths.
+- Guests are costumes. Seats are dealt from a hash of the round (and the voter, in free play), never from the run or its model.
+- Before a decision the server withholds: config, model, system prompt, run id, tokens, cost, word counts, the scorer's result, thinking blocks, latencies, real timestamps, the agent's working-folder name, the trap flag, and the guests' expressions (PLAN Sections 4.1 and 0.1). Redaction happens on the server, never in the browser.
+- Nothing shown before a decision may depend on recorded time. Replays use one fixed pace.
+- Any new field that reveals the result, the cost, the speed, or the identity of an author must be added to the blind-view redaction and to `WITHHELD_KEYS` in the leak scan, and a new mode must be added to the every-mode leak test.
+- Points come only from answers that can be right or wrong. A preference earns nothing, and nothing is awarded for agreeing with other players.
+- Elo uses only preferences from The Drawing Room and The Library Gathering, never a trap round.
+- Every decision stores its mode, kind, the guest and position of each letter, confidence, the trap flag, answer lengths, and pass state.
 - Model output is untrusted. Render it only through `AnswerView`: markdown with no raw-HTML plugin, Mermaid at the strict security level.
+- No real author's name, detective, or book title anywhere in the product; a test scans for them.
+
+### Theme
+
+- Colours, fonts, and ornament measures are tokens in `globals.css`. Components use Tailwind names mapped to tokens and never a colour literal. No gradients (the pinstripe is hard-edged), no emoji.
+- Text on a dark surface and text on parchment use different tokens; put content on paper inside `.parchment` or `.on-parchment` and the semantic names (`foreground`, `muted-foreground`, `border`) switch by themselves.
+- Component classes are prefixed `deco-`: Mermaid uses `label` and `title` inside diagrams.
 
 ### Cost and safety
 
@@ -135,7 +153,7 @@ Planned, not yet available: `pnpm test:e2e`. The Postgres store tests run only w
 - Never hardcode API keys. Real keys go in `.env` only. `.env.example` is committed to a public repo and must keep every secret empty; `pnpm lint` checks this.
 - No test may call a real model. Use the scripted fake client.
 - Recordings written to `data/recordings/` are scrubbed of API keys, auth headers, and `.env` values, and a test fails if a key-like pattern appears there.
-- The 90 runs are recorded. Do not re-record or add runs without being asked: a new run replaces a file that matches and votes refer to.
+- The 180 runs are recorded. Do not re-record or add runs without being asked: a new run replaces a file that rounds and decisions refer to.
 - Task content is synthetic only.
 - Agent tools have no live web access. `python_exec` runs only in the sandbox container. Never mount the Docker socket.
 - Rate limit counters live in the database, not in memory.
@@ -146,8 +164,7 @@ Planned, not yet available: `pnpm test:e2e`. The Postgres store tests run only w
 - TypeScript: strict, no `any`.
 - Python: every function typed; mypy clean.
 - Keep functions small.
-- Design tokens (colors, fonts, radii, spacing) live in one stylesheet as CSS variables. Components never hardcode them. The theme is not chosen yet; use neutral shadcn defaults.
-- Left and right panes must be distinguishable without color alone, and meet WCAG AA contrast.
+- Letters must be distinguishable without colour alone (each has a letter and a guest), and all text meets WCAG AA contrast.
 
 ### Next.js 16
 

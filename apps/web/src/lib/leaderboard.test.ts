@@ -4,19 +4,205 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { eloRatings } from "@/lib/elo";
 import {
   agreement,
   buildLeaderboard,
+  costumeBias,
+  eloVotes,
   lengthBias,
+  MIN_BIAS_VOTES,
+  modelTotals,
   objectiveTable,
   officialRanking,
   positionBias,
+  rankingToPairwise,
 } from "@/lib/leaderboard";
-import type { OfficialBenchmarks, RunHeader, VoteRecord } from "@/lib/types";
+import type { OfficialBenchmarks, RunHeader } from "@/lib/types";
+import { decision, HAIKU, letter, OPUS, SONNET } from "@/test/decisions";
 
 const OFFICIAL = JSON.parse(
   readFileSync(join(process.cwd(), "..", "..", "data", "official-benchmarks.json"), "utf8"),
 ) as OfficialBenchmarks;
+
+const ranking = (order: ("A" | "B" | "C")[]) =>
+  decision({
+    mode: "library",
+    kind: "ranking",
+    answer: { type: "ranking", order },
+    letters: [letter("A", OPUS), letter("B", SONNET), letter("C", HAIKU)],
+  });
+
+describe("a ranking as pairwise results", () => {
+  it("makes three results from three letters: each beats those ranked below it", () => {
+    expect(rankingToPairwise(["x", "y", "z"])).toEqual([
+      { winner: "x", loser: "y" },
+      { winner: "x", loser: "z" },
+      { winner: "y", loser: "z" },
+    ]);
+  });
+
+  it("feeds Elo three wins tagged with the mode", () => {
+    const votes = eloVotes([ranking(["C", "A", "B"])]);
+
+    expect(votes).toEqual([
+      { left: `${HAIKU}@v1`, right: `${OPUS}@v1`, choice: "left", mode: "library" },
+      { left: `${HAIKU}@v1`, right: `${SONNET}@v1`, choice: "left", mode: "library" },
+      { left: `${OPUS}@v1`, right: `${SONNET}@v1`, choice: "left", mode: "library" },
+    ]);
+  });
+});
+
+describe("which decisions count toward Elo", () => {
+  it("counts Drawing Room preferences, with each choice mapped to a result", () => {
+    const votes = eloVotes([
+      decision({ answer: { type: "trust", choice: "A" } }),
+      decision({ answer: { type: "trust", choice: "B" } }),
+      decision({ answer: { type: "trust", choice: "equal" } }),
+      decision({ answer: { type: "trust", choice: "neither" } }),
+    ]);
+
+    expect(votes.map((vote) => vote.choice)).toEqual(["left", "right", "tie", "both_bad"]);
+    expect(votes.every((vote) => vote.left === `${OPUS}@v1` && vote.mode === "drawing_room")).toBe(
+      true,
+    );
+  });
+
+  it("never counts a trap round", () => {
+    const trap = decision({
+      trap: true,
+      letters: [letter("A", OPUS), letter("B", OPUS)],
+      outcome: "wrong",
+    });
+
+    expect(eloVotes([trap])).toEqual([]);
+  });
+
+  it("never counts the Weekend, the Morning Post, or the Timetable", () => {
+    const elsewhere = (["weekend", "morning_post", "timetable"] as const).map((mode) =>
+      decision({ mode }),
+    );
+
+    expect(eloVotes(elsewhere)).toEqual([]);
+  });
+
+  it("does not count an accusation as a preference", () => {
+    expect(
+      eloVotes([decision({ answer: { type: "accuse" }, outcome: "wrong", points: -30 })]),
+    ).toEqual([]);
+    expect(
+      eloVotes([decision({ mode: "library", kind: "ranking", answer: { type: "accuse" } })]),
+    ).toEqual([]);
+  });
+
+  it("leaves the ratings untouched by trap and Weekend votes", () => {
+    const real = [decision({}), ranking(["A", "B", "C"])];
+    const noise = [
+      decision({ trap: true, letters: [letter("A", OPUS), letter("B", OPUS)] }),
+      decision({ mode: "weekend", answer: { type: "trust", choice: "B" } }),
+    ];
+
+    expect(eloRatings(eloVotes([...real, ...noise]))).toEqual(eloRatings(eloVotes(real)));
+  });
+});
+
+describe("costume bias", () => {
+  it("reports, per guest, how often that guest's letter was the one trusted", () => {
+    const votes = [
+      decision({ answer: { type: "trust", choice: "A" } }), // constance trusted over pike
+      decision({ answer: { type: "trust", choice: "A" } }),
+      decision({ answer: { type: "trust", choice: "B" } }), // pike trusted
+      decision({ answer: { type: "trust", choice: "equal" } }), // not a sided vote
+    ];
+    const rows = costumeBias(votes);
+    const of = (guest: string) => rows.find((row) => row.guest === guest)!;
+
+    expect(of("constance")).toMatchObject({ votes: 3, picks: 2 });
+    expect(of("pike")).toMatchObject({ votes: 3, picks: 1 });
+    expect(of("ivy")).toMatchObject({ votes: 0, picks: 0, rate: null });
+    expect(rows).toHaveLength(6);
+  });
+
+  it("includes trap rounds, where the author is the same and only the costume differs", () => {
+    const trap = decision({
+      trap: true,
+      letters: [letter("A", OPUS), letter("B", OPUS)],
+      answer: { type: "trust", choice: "B" },
+    });
+
+    expect(costumeBias([trap]).find((row) => row.guest === "pike")).toMatchObject({
+      votes: 1,
+      picks: 1,
+    });
+  });
+});
+
+describe("position bias", () => {
+  it("is the share of sided votes that trusted the first letter shown", () => {
+    const bias = positionBias([
+      decision({ answer: { type: "trust", choice: "A" } }),
+      decision({ answer: { type: "trust", choice: "A" } }),
+      decision({ answer: { type: "trust", choice: "B" } }),
+      decision({ answer: { type: "trust", choice: "neither" } }),
+      decision({ answer: { type: "accuse" } }),
+    ]);
+
+    expect(bias).toMatchObject({ votes: 3, picks: 2 });
+  });
+});
+
+describe("length bias", () => {
+  const pair = (a: number, b: number) => [
+    letter("A", OPUS, { answer_words: a }),
+    letter("B", HAIKU, { answer_words: b }),
+  ];
+
+  it("reports how often the longer letter was trusted, on open-ended tasks", () => {
+    const bias = lengthBias([
+      decision({ letters: pair(90, 60), answer: { type: "trust", choice: "A" } }),
+      decision({ letters: pair(90, 60), answer: { type: "trust", choice: "B" } }),
+      decision({ letters: pair(40, 80), answer: { type: "trust", choice: "B" } }),
+      // Left out: equal lengths, "equally good", a task with a right answer, a trap.
+      decision({ letters: pair(70, 70), answer: { type: "trust", choice: "A" } }),
+      decision({ letters: pair(90, 60), answer: { type: "trust", choice: "equal" } }),
+      decision({ letters: pair(500, 5), open_ended: false }),
+      decision({ letters: pair(500, 5), trap: true }),
+    ]);
+
+    expect(bias.overall).toMatchObject({ votes: 3, picks: 2 });
+    expect(bias.excluded).toBe(2);
+  });
+});
+
+describe("agreement between votes and the scorer", () => {
+  const scored = (a: boolean, b: boolean, choice: "A" | "B" | "equal") =>
+    decision({
+      open_ended: false,
+      task_category: "code",
+      letters: [letter("A", OPUS, { passed: a }), letter("B", HAIKU, { passed: b })],
+      answer: { type: "trust", choice },
+    });
+
+  it("counts only rounds where exactly one letter passed", () => {
+    const stat = agreement([
+      scored(true, false, "A"),
+      scored(true, false, "B"),
+      scored(false, true, "B"),
+      scored(true, false, "equal"),
+      scored(true, true, "A"),
+      decision({}),
+    ]);
+
+    expect(stat).toMatchObject({ decisive_votes: 4, agreeing_votes: 2, agreement_rate: 0.5 });
+  });
+
+  it("ignores traps and modes that do not count toward the record", () => {
+    const weekend = { ...scored(true, false, "A"), mode: "weekend" as const };
+    const trap = { ...scored(true, false, "A"), trap: true };
+
+    expect(agreement([weekend, trap]).decisive_votes).toBe(0);
+  });
+});
 
 function run(changes: Partial<RunHeader>): RunHeader {
   return {
@@ -24,8 +210,9 @@ function run(changes: Partial<RunHeader>): RunHeader {
     config_id: "opus@v1",
     config_name: "opus",
     display_name: "Opus",
-    model: "claude-opus-5-5",
+    model: OPUS,
     task_id: "code-01",
+    take: 1,
     category: "code",
     stop_reason: "answered",
     passed: true,
@@ -48,38 +235,10 @@ function run(changes: Partial<RunHeader>): RunHeader {
   };
 }
 
-function vote(changes: Partial<VoteRecord>): VoteRecord {
-  return {
-    match_id: "m",
-    voter_id: "v",
-    choice: "left",
-    left_config_id: "opus@v1",
-    right_config_id: "haiku@v1",
-    left_passed: true,
-    right_passed: false,
-    left_answer_words: 10,
-    right_answer_words: 10,
-    task_id: "code-01",
-    task_category: "code",
-    open_ended: false,
-    created_at: "2026-10-02T00:00:00Z",
-    ...changes,
-  };
-}
-
-const openVote = (changes: Partial<VoteRecord>) =>
-  vote({
-    left_passed: null,
-    right_passed: null,
-    open_ended: true,
-    task_category: "writing",
-    ...changes,
-  });
-
-describe("our scorer's table", () => {
+describe("our scorer's totals", () => {
   const runs = [
     run({}),
-    run({ passed: false, score: 0, reference_cost_usd: 0.03 }),
+    run({ passed: false, score: 0 }),
     run({
       category: "writing",
       scorer_type: "constraints",
@@ -89,129 +248,50 @@ describe("our scorer's table", () => {
       checks_total: 6,
       answer_words: 100,
     }),
+    // A second take: recorded for trap rounds, and not part of the totals.
+    run({ take: 2, passed: false, score: 0, answer_words: 999 }),
   ];
-  const [row, empty] = objectiveTable(runs, ["opus@v1", "haiku@v1"]);
 
-  it("keeps pass rate to tasks with a right answer", () => {
-    expect(row).toMatchObject({ runs: 3, scored_runs: 2, passes: 1, pass_rate: 0.5 });
-    expect(row.pass_ci?.low).toBeLessThan(0.5);
-    expect(row.passes_per_reference_dollar).toBeCloseTo(25, 6);
-  });
+  it("uses first runs only", () => {
+    const totals = modelTotals(runs, "opus@v1");
 
-  it("reports constraints met separately, as a share of checks", () => {
-    expect(row).toMatchObject({ constraint_runs: 1, checks_met: 3, checks_total: 6 });
-    expect(row.constraints_met_rate).toBe(0.5);
-  });
-
-  it("averages over every run", () => {
-    expect(row.mean_score).toBeCloseTo(0.5, 6);
-    expect(row.mean_answer_words).toBe(60);
-  });
-
-  it("shows a config with no runs as empty, not as zero", () => {
-    expect(empty).toMatchObject({ runs: 0, pass_rate: null, pass_ci: null, mean_score: null });
-    expect(empty.constraints_met_rate).toBeNull();
-  });
-});
-
-describe("agreement between votes and the scorer", () => {
-  it("counts only matches where exactly one side passed, and ties as disagreement", () => {
-    const stat = agreement([
-      vote({ choice: "left" }),
-      vote({ choice: "right" }),
-      vote({ choice: "tie" }),
-      vote({ left_passed: false, right_passed: true, choice: "right" }),
-      vote({ right_passed: true, choice: "left" }),
-      vote({ left_passed: false, choice: "both_bad" }),
-    ]);
-
-    expect(stat.decisive_votes).toBe(4);
-    expect(stat.agreeing_votes).toBe(2);
-    expect(stat.agreement_rate).toBe(0.5);
-    expect(stat.table.one_passed).toEqual({
-      picked_passing: 2,
-      picked_failing: 1,
-      tie: 1,
-      both_bad: 0,
+    expect(totals).toMatchObject({
+      runs: 3,
+      scored_runs: 2,
+      passes: 1,
+      checks_met: 3,
+      checks_total: 6,
+      mean_answer_words: 60,
     });
-    expect(stat.table.both_passed.left).toBe(1);
-    expect(stat.table.both_failed.both_bad).toBe(1);
   });
 
-  it("ignores open-ended tasks, which have no pass or fail", () => {
-    const stat = agreement([openVote({ choice: "left" }), openVote({ choice: "right" })]);
+  it("keeps pass rate and rules met apart, and shows an author with no runs as empty", () => {
+    const [row, empty] = objectiveTable(runs, ["opus@v1", "haiku@v1"]);
 
-    expect(stat.decisive_votes).toBe(0);
-    expect(stat.agreement_rate).toBeNull();
-    expect(stat.ci).toBeNull();
-  });
-});
-
-describe("length bias", () => {
-  const votes = [
-    openVote({ choice: "left", left_answer_words: 90, right_answer_words: 60 }),
-    openVote({ choice: "right", left_answer_words: 90, right_answer_words: 60 }),
-    openVote({ choice: "right", left_answer_words: 40, right_answer_words: 80 }),
-    openVote({
-      choice: "left",
-      left_answer_words: 80,
-      right_answer_words: 50,
-      task_category: "explanation",
-    }),
-    // Left out: a tie, an equal-length pair, and a task with a right answer.
-    openVote({ choice: "tie", left_answer_words: 90, right_answer_words: 60 }),
-    openVote({ choice: "left", left_answer_words: 70, right_answer_words: 70 }),
-    vote({ choice: "left", left_answer_words: 500, right_answer_words: 5 }),
-  ];
-  const bias = lengthBias(votes);
-
-  it("reports how often the longer answer was picked", () => {
-    expect(bias.overall).toMatchObject({ votes: 4, picks: 3, rate: 0.75 });
-    expect(bias.excluded).toBe(2);
-  });
-
-  it("breaks the rate down by category", () => {
-    expect(bias.by_category.writing).toMatchObject({ votes: 3, picks: 2 });
-    expect(bias.by_category.explanation).toMatchObject({ votes: 1, picks: 1 });
-    expect(bias.by_category.code).toBeUndefined();
-  });
-
-  it("has no rate without usable votes", () => {
-    expect(lengthBias([]).overall).toEqual({ votes: 0, picks: 0, rate: null, ci: null });
-  });
-});
-
-describe("position bias", () => {
-  it("is the share of left-or-right votes that picked the left pane", () => {
-    const bias = positionBias([
-      vote({ choice: "left" }),
-      vote({ choice: "left" }),
-      vote({ choice: "right" }),
-      vote({ choice: "tie" }),
-    ]);
-
-    expect(bias).toMatchObject({ votes: 3, picks: 2 });
+    expect(row.pass_rate).toBe(0.5);
+    expect(row.constraints_met_rate).toBe(0.5);
+    expect(row.mean_score).toBeCloseTo(0.5, 6);
+    expect(empty).toMatchObject({ runs: 0, pass_rate: null, mean_score: null });
   });
 });
 
 describe("official ranking from Anthropic's published scores", () => {
-  const models = ["claude-haiku-4-5", "claude-opus-5-5", "claude-sonnet-5-5"];
-  const standings = officialRanking(OFFICIAL, models);
+  const standings = officialRanking(OFFICIAL, [HAIKU, OPUS, SONNET]);
   const of = (model: string) => standings.find((row) => row.model === model)!;
 
   it("puts Opus 5.5 ahead of Sonnet 5.5 on the benchmarks they share", () => {
-    const opusVsSonnet = of("claude-opus-5-5").versus.find(
-      (record) => record.model === "claude-sonnet-5-5",
-    );
-
-    expect(opusVsSonnet).toEqual({ model: "claude-sonnet-5-5", shared: 8, wins: 7, losses: 1 });
-    expect(of("claude-opus-5-5").rank).toBe(1);
-    expect(of("claude-sonnet-5-5").rank).toBe(2);
+    expect(of(OPUS).versus.find((record) => record.model === SONNET)).toEqual({
+      model: SONNET,
+      shared: 8,
+      wins: 7,
+      losses: 1,
+    });
+    expect(of(OPUS).rank).toBe(1);
+    expect(of(SONNET).rank).toBe(2);
   });
 
   it("gives Haiku 4.5 no rank, because it shares no benchmark with the others", () => {
-    expect(of("claude-haiku-4-5").rank).toBeNull();
-    expect(of("claude-haiku-4-5").versus.every((record) => record.shared === 0)).toBe(true);
+    expect(of(HAIKU).rank).toBeNull();
   });
 
   it("reads a data file in which every score names a listed source", () => {
@@ -219,57 +299,55 @@ describe("official ranking from Anthropic's published scores", () => {
     for (const benchmark of OFFICIAL.benchmarks) {
       for (const score of benchmark.scores) {
         expect(OFFICIAL.sources[score.source]?.url).toMatch(/^https:\/\/www\.anthropic\.com\//);
-        expect(score.display).toContain(String(score.value).replace(/\.0$/, ""));
       }
     }
   });
 });
 
-describe("the whole leaderboard", () => {
+describe("the whole record", () => {
   const configs = [
-    { id: "opus@v1", display_name: "Opus", model: "claude-opus-5-5" },
-    { id: "haiku@v1", display_name: "Haiku", model: "claude-haiku-4-5" },
+    { id: `${OPUS}@v1`, display_name: "Opus", model: OPUS },
+    { id: `${HAIKU}@v1`, display_name: "Haiku", model: HAIKU },
   ];
-  const runs = [
-    run({}),
-    run({ config_id: "haiku@v1", model: "claude-haiku-4-5", passed: false, score: 0 }),
-    run({ category: "writing", scorer_type: "constraints", passed: null, score: 0.5 }),
-    run({
-      config_id: "haiku@v1",
-      category: "writing",
-      scorer_type: "constraints",
-      passed: null,
-      score: 1,
-    }),
-  ];
-  const votes = [vote({ choice: "right" }), openVote({ choice: "left" })];
+  const sided = (count: number) => Array.from({ length: count }, () => decision({}));
 
-  it("puts the three rankings side by side", () => {
-    const board = buildLeaderboard(runs, votes, OFFICIAL, configs, null);
-    const opus = board.headline.find((row) => row.config === "opus@v1");
-    const haiku = board.headline.find((row) => row.config === "haiku@v1");
+  it("holds back costume and position bias until there are enough votes", () => {
+    const few = buildLeaderboard([], sided(MIN_BIAS_VOTES - 1), OFFICIAL, configs, null);
+    const enough = buildLeaderboard([], sided(MIN_BIAS_VOTES), OFFICIAL, configs, null);
 
-    expect(board.votes).toBe(2);
-    // One win each, so the ratings differ only by order of play.
-    expect(opus?.elo_rank).not.toBeNull();
-    expect(opus?.official_rank).toBeNull();
-    expect(haiku?.official_rank).toBeNull();
-    expect(opus?.scorer_rank).toBe(1);
-    expect(haiku?.scorer_rank).toBe(2);
+    expect(few.costume_bias).toBeNull();
+    expect(few.position_bias).toBeNull();
+    expect(few).toMatchObject({
+      bias_votes: MIN_BIAS_VOTES - 1,
+      bias_votes_needed: MIN_BIAS_VOTES,
+    });
+    expect(enough.costume_bias).toHaveLength(6);
+    expect(enough.position_bias).toMatchObject({ votes: MIN_BIAS_VOTES, picks: MIN_BIAS_VOTES });
   });
 
-  it("filters runs and votes by category", () => {
-    const board = buildLeaderboard(runs, votes, OFFICIAL, configs, "writing");
-    const haiku = board.headline.find((row) => row.config === "haiku@v1");
+  it("counts comparisons by mode and filters by category", () => {
+    const board = buildLeaderboard(
+      [],
+      [decision({}), ranking(["A", "B", "C"]), decision({ task_category: "code" })],
+      OFFICIAL,
+      configs,
+      null,
+    );
+    const code = buildLeaderboard(
+      [],
+      [decision({}), decision({ task_category: "code" })],
+      OFFICIAL,
+      configs,
+      "code",
+    );
 
-    expect(board.votes).toBe(1);
-    expect(haiku?.scorer_rank).toBe(1);
-    expect(board.objective.every((row) => row.scored_runs === 0)).toBe(true);
-    expect(board.agreement.decisive_votes).toBe(0);
+    expect(board.votes).toBe(5);
+    expect(board.votes_by_mode).toEqual({ drawing_room: 2, library: 3 });
+    expect(code.votes).toBe(1);
   });
 
   it("shows no vote rank before anyone has voted", () => {
-    const board = buildLeaderboard(runs, [], OFFICIAL, configs, null);
+    const board = buildLeaderboard([], [], OFFICIAL, configs, null);
 
     expect(board.headline.every((row) => row.elo_rank === null && row.votes === 0)).toBe(true);
   });

@@ -1,31 +1,38 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Josefin_Sans, Libre_Baskerville, Limelight } from "next/font/google";
 
 import { Providers } from "@/components/providers";
+import { SiteFooter, SiteHeader } from "@/components/site-header";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const limelight = Limelight({ variable: "--font-limelight", weight: "400", subsets: ["latin"] });
+const baskerville = Libre_Baskerville({
+  variable: "--font-baskerville",
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
   subsets: ["latin"],
 });
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const josefin = Josefin_Sans({ variable: "--font-josefin", weight: "600", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Agent Eval Arena",
+  title: "Poison Pen: A Wrenfield Hall Mystery",
   description:
-    "Run two agent configs on the same task, compare their traces side by side, and vote blind.",
+    "Unsigned letters appear at dinner. Three authors wrote them; six guests carry them. Decide which to trust, and unmask the author.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${limelight.variable} ${baskerville.variable} ${josefin.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <SiteHeader />
+          <div className="flex flex-1 flex-col">{children}</div>
+          <SiteFooter />
+        </Providers>
       </body>
     </html>
   );

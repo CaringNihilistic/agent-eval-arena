@@ -1,48 +1,84 @@
-// The vote log and the rate-limit counters. Both live in Postgres so they survive
-// restarts and are shared between serverless instances.
+// The decision log, share links, challenges, and rate-limit counters. All in
+// Postgres, so they survive restarts and are shared between serverless instances.
+
+import { randomBytes } from "node:crypto";
 
 import postgres from "postgres";
 
-import type { Choice } from "@/lib/elo";
-import type { Category, VoteRecord } from "@/lib/types";
+import type { DecisionRecord } from "@/lib/types";
 
-export interface NewVote extends Omit<VoteRecord, "created_at"> {
+export interface NewDecision extends Omit<DecisionRecord, "created_at"> {
   ip_hash: string;
 }
 
-export interface VoteStore {
-  /** The voter's vote on this match, or null. */
-  voteOn(matchId: string, voterId: string): Promise<Choice | null>;
-  votedMatchIds(voterId: string): Promise<Set<string>>;
-  /** False if this voter has already voted on this match. */
-  insertVote(vote: NewVote): Promise<boolean>;
-  /** Every vote, oldest first: the order Elo is replayed in. */
-  allVotes(): Promise<VoteRecord[]>;
-  votesOn(matchId: string): Promise<Choice[]>;
+export interface Challenge {
+  id: string;
+  seed: string;
+  voter_id: string;
+}
+
+export interface Store {
+  /** This player's decision on a round, or null. */
+  decisionOn(roundId: string, voterId: string): Promise<DecisionRecord | null>;
+  /** Everything a player has decided, oldest first. */
+  decisionsBy(voterId: string): Promise<DecisionRecord[]>;
+  /** False if this player has already decided this round. */
+  insertDecision(decision: NewDecision): Promise<boolean>;
+  /** Every decision, oldest first: the order Elo is replayed in. */
+  allDecisions(): Promise<DecisionRecord[]>;
+  /** Every player's decisions on one pairing. */
+  decisionsOnContent(contentKey: string): Promise<DecisionRecord[]>;
   /** Add one to a counter and return its new value, in one atomic statement. */
   hit(bucket: string, windowStart: Date): Promise<number>;
+  /** The public id of a player's Casebook, made on first use. */
+  shareIdFor(voterId: string): Promise<string>;
+  voterForShare(shareId: string): Promise<string | null>;
+  createChallenge(seed: string, voterId: string): Promise<string>;
+  challenge(id: string): Promise<Challenge | null>;
+}
+
+/** A random id for a public link. It carries no information about the player. */
+export function publicId(): string {
+  return randomBytes(9).toString("base64url");
 }
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS votes (
+CREATE TABLE IF NOT EXISTS decisions (
   id bigserial PRIMARY KEY,
-  match_id text NOT NULL,
+  round_id text NOT NULL,
   voter_id text NOT NULL,
   ip_hash text NOT NULL,
-  choice text NOT NULL CHECK (choice IN ('left', 'right', 'tie', 'both_bad')),
-  left_config_id text NOT NULL,
-  right_config_id text NOT NULL,
-  left_passed boolean,
-  right_passed boolean,
-  left_answer_words integer NOT NULL,
-  right_answer_words integer NOT NULL,
+  mode text NOT NULL,
+  kind text NOT NULL,
+  game text,
+  round_index integer,
+  content_key text NOT NULL,
   task_id text NOT NULL,
   task_category text NOT NULL,
   open_ended boolean NOT NULL,
+  trap boolean NOT NULL,
+  answer jsonb NOT NULL,
+  confidence text NOT NULL CHECK (confidence IN ('hunch', 'fairly', 'certain')),
+  letters jsonb NOT NULL,
+  outcome text NOT NULL CHECK (outcome IN ('right', 'wrong', 'none')),
+  points integer NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (match_id, voter_id)
+  UNIQUE (round_id, voter_id)
 );
-CREATE INDEX IF NOT EXISTS votes_voter ON votes (voter_id);
+CREATE INDEX IF NOT EXISTS decisions_voter ON decisions (voter_id);
+CREATE INDEX IF NOT EXISTS decisions_content ON decisions (content_key);
+CREATE TABLE IF NOT EXISTS shares (
+  share_id text PRIMARY KEY,
+  voter_id text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS challenges (
+  id text PRIMARY KEY,
+  seed text NOT NULL,
+  voter_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (seed, voter_id)
+);
 CREATE TABLE IF NOT EXISTS rate_limit_counters (
   bucket text NOT NULL,
   window_start timestamptz NOT NULL,
@@ -51,78 +87,89 @@ CREATE TABLE IF NOT EXISTS rate_limit_counters (
 );
 `;
 
-interface VoteRow {
-  match_id: string;
-  voter_id: string;
-  choice: Choice;
-  left_config_id: string;
-  right_config_id: string;
-  left_passed: boolean | null;
-  right_passed: boolean | null;
-  left_answer_words: number;
-  right_answer_words: number;
-  task_id: string;
-  task_category: Category;
-  open_ended: boolean;
-  created_at: Date;
+type DecisionRow = Omit<DecisionRecord, "created_at"> & { created_at: Date };
+
+const COLUMNS = [
+  "round_id",
+  "voter_id",
+  "mode",
+  "kind",
+  "game",
+  "round_index",
+  "content_key",
+  "task_id",
+  "task_category",
+  "open_ended",
+  "trap",
+  "answer",
+  "confidence",
+  "letters",
+  "outcome",
+  "points",
+  "created_at",
+] as const;
+
+function record(row: DecisionRow): DecisionRecord {
+  return { ...row, created_at: row.created_at.toISOString() };
 }
 
-export function postgresStore(url: string): VoteStore {
+export function postgresStore(url: string): Store {
   const sql = postgres(url, { max: 5, onnotice: () => {} });
   let ready: Promise<unknown> | undefined;
   // Creating the tables is idempotent, so every process may do it on first use.
   const prepared = () => (ready ??= sql.unsafe(SCHEMA));
+  const columns = sql(COLUMNS);
 
   return {
-    async voteOn(matchId, voterId) {
+    async decisionOn(roundId, voterId) {
       await prepared();
-      const rows = await sql<{ choice: Choice }[]>`
-        SELECT choice FROM votes WHERE match_id = ${matchId} AND voter_id = ${voterId}`;
-      return rows[0]?.choice ?? null;
+      const rows = await sql<DecisionRow[]>`
+        SELECT ${columns} FROM decisions WHERE round_id = ${roundId} AND voter_id = ${voterId}`;
+      return rows[0] ? record(rows[0]) : null;
     },
-    async votedMatchIds(voterId) {
+    async decisionsBy(voterId) {
       await prepared();
-      const rows = await sql<{ match_id: string }[]>`
-        SELECT match_id FROM votes WHERE voter_id = ${voterId}`;
-      return new Set(rows.map((row) => row.match_id));
+      const rows = await sql<DecisionRow[]>`
+        SELECT ${columns} FROM decisions WHERE voter_id = ${voterId} ORDER BY created_at, id`;
+      return rows.map(record);
     },
-    async insertVote(vote) {
+    async insertDecision(decision) {
       await prepared();
       const rows = await sql`
-        INSERT INTO votes ${sql(
-          vote,
-          "match_id",
-          "voter_id",
-          "ip_hash",
-          "choice",
-          "left_config_id",
-          "right_config_id",
-          "left_passed",
-          "right_passed",
-          "left_answer_words",
-          "right_answer_words",
-          "task_id",
-          "task_category",
-          "open_ended",
-        )}
-        ON CONFLICT (match_id, voter_id) DO NOTHING
+        INSERT INTO decisions ${sql({
+          round_id: decision.round_id,
+          voter_id: decision.voter_id,
+          ip_hash: decision.ip_hash,
+          mode: decision.mode,
+          kind: decision.kind,
+          game: decision.game,
+          round_index: decision.round_index,
+          content_key: decision.content_key,
+          task_id: decision.task_id,
+          task_category: decision.task_category,
+          open_ended: decision.open_ended,
+          trap: decision.trap,
+          answer: sql.json(decision.answer),
+          confidence: decision.confidence,
+          letters: sql.json(decision.letters as never),
+          outcome: decision.outcome,
+          points: decision.points,
+        })}
+        ON CONFLICT (round_id, voter_id) DO NOTHING
         RETURNING id`;
       return rows.length === 1;
     },
-    async allVotes() {
+    async allDecisions() {
       await prepared();
-      const rows = await sql<VoteRow[]>`
-        SELECT match_id, voter_id, choice, left_config_id, right_config_id, left_passed,
-               right_passed, left_answer_words, right_answer_words, task_id, task_category,
-               open_ended, created_at
-        FROM votes ORDER BY created_at, id`;
-      return rows.map((row) => ({ ...row, created_at: row.created_at.toISOString() }));
+      const rows = await sql<DecisionRow[]>`
+        SELECT ${columns} FROM decisions ORDER BY created_at, id`;
+      return rows.map(record);
     },
-    async votesOn(matchId) {
+    async decisionsOnContent(contentKey) {
       await prepared();
-      const rows = await sql<{ choice: Choice }[]>`
-        SELECT choice FROM votes WHERE match_id = ${matchId}`;
-      return rows.map((row) => row.choice);
+      const rows = await sql<DecisionRow[]>`
+        SELECT ${columns} FROM decisions WHERE content_key = ${contentKey} ORDER BY created_at, id`;
+      return rows.map(record);
     },
     async hit(bucket, windowStart) {
       await prepared();
@@ -134,15 +181,43 @@ export function postgresStore(url: string): VoteStore {
         RETURNING count`;
       return rows[0].count;
     },
+    async shareIdFor(voterId) {
+      await prepared();
+      const rows = await sql<{ share_id: string }[]>`
+        INSERT INTO shares (share_id, voter_id) VALUES (${publicId()}, ${voterId})
+        ON CONFLICT (voter_id) DO UPDATE SET voter_id = EXCLUDED.voter_id
+        RETURNING share_id`;
+      return rows[0].share_id;
+    },
+    async voterForShare(shareId) {
+      await prepared();
+      const rows = await sql<{ voter_id: string }[]>`
+        SELECT voter_id FROM shares WHERE share_id = ${shareId}`;
+      return rows[0]?.voter_id ?? null;
+    },
+    async createChallenge(seed, voterId) {
+      await prepared();
+      const rows = await sql<{ id: string }[]>`
+        INSERT INTO challenges (id, seed, voter_id) VALUES (${publicId()}, ${seed}, ${voterId})
+        ON CONFLICT (seed, voter_id) DO UPDATE SET seed = EXCLUDED.seed
+        RETURNING id`;
+      return rows[0].id;
+    },
+    async challenge(id) {
+      await prepared();
+      const rows = await sql<Challenge[]>`
+        SELECT id, seed, voter_id FROM challenges WHERE id = ${id}`;
+      return rows[0] ?? null;
+    },
   };
 }
 
-let cached: VoteStore | undefined;
+let cached: Store | undefined;
 
 export class StoreNotConfiguredError extends Error {}
 
-/** The vote store for this server process. */
-export function voteStore(): VoteStore {
+/** The store for this server process. */
+export function store(): Store {
   if (!cached) {
     const url = process.env.DATABASE_URL;
     if (!url) {

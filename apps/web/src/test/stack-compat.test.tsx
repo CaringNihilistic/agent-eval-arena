@@ -7,25 +7,12 @@ import { ReactFlow, type Edge, type Node } from "@xyflow/react";
 import { Line, LineChart, XAxis } from "recharts";
 import { describe, expect, it } from "vitest";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 describe("stack compatibility", () => {
-  it("renders shadcn/ui components", () => {
-    render(
-      <Card>
-        <CardHeader>
-          <CardTitle>Scorecard</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Badge>pass</Badge>
-          <Button>Vote</Button>
-        </CardContent>
-      </Card>,
-    );
+  it("renders a shadcn/ui component", () => {
+    render(<Button>Vote</Button>);
 
-    expect(screen.getByText("Scorecard")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Vote" })).toBeInTheDocument();
   });
 

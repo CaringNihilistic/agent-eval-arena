@@ -1,18 +1,17 @@
 """Records the task bank for each config into `data/recordings/`, resumably.
 
-The folder is the store: one JSONL file per run, plus three index files the web
-app reads. A (config, task) pair is done when its file exists, so running the
-command again continues where the last one stopped.
+The folder is the store: one JSONL file per run, plus two index files the web
+app reads. A (config, task, take) is done when its file exists, so running the
+command again continues where the last one stopped. A second take of the same
+config on the same task is what an impostor round shows in two seats.
 """
 
 import asyncio
-import hashlib
 import json
 import os
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from itertools import combinations
 from pathlib import Path
 from typing import Any, Literal
 
@@ -46,11 +45,12 @@ class RecordReport:
     detail: str | None = None
 
 
-def run_path(out_dir: Path, config_name: str, task_id: str) -> Path:
-    return out_dir / "runs" / f"{config_name}__{task_id}.jsonl"
+def run_path(out_dir: Path, config_name: str, task_id: str, take: int = 1) -> Path:
+    suffix = "" if take == 1 else f"__{take}"
+    return out_dir / "runs" / f"{config_name}__{task_id}{suffix}.jsonl"
 
 
-def run_header(config: AgentConfig, task: Task, result: RunResult) -> dict[str, Any]:
+def run_header(config: AgentConfig, task: Task, result: RunResult, take: int = 1) -> dict[str, Any]:
     """Everything about a run that the leaderboards need, without reading its events."""
     return {
         "record": "run",
@@ -60,6 +60,7 @@ def run_header(config: AgentConfig, task: Task, result: RunResult) -> dict[str, 
         "display_name": config.display_name,
         "model": config.model,
         "task_id": task.id,
+        "take": take,
         "category": task.category,
         "stop_reason": result.stop_reason,
         "passed": result.passed,
@@ -108,52 +109,21 @@ def read_header(path: Path) -> dict[str, Any]:
     return header
 
 
-def match_id(task_id: str, first: str, second: str) -> str:
-    digest = hashlib.sha256(f"{task_id}|{first}|{second}".encode()).hexdigest()
-    return f"m_{digest[:12]}"
-
-
-def build_matches(headers: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Every pair of configs that both ran a task. Which run goes on the left is
-    fixed by a hash, so it is random across matches and the same on every build."""
-    by_task: dict[str, list[dict[str, Any]]] = {}
-    for header in headers:
-        by_task.setdefault(header["task_id"], []).append(header)
-    matches = []
-    for task_id in sorted(by_task):
-        runs = sorted(by_task[task_id], key=lambda item: item["config_name"])
-        for first, second in combinations(runs, 2):
-            identifier = match_id(task_id, first["config_name"], second["config_name"])
-            flip = int(hashlib.sha256(identifier.encode()).hexdigest(), 16) % 2 == 1
-            left, right = (second, first) if flip else (first, second)
-            matches.append(
-                {
-                    "id": identifier,
-                    "task_id": task_id,
-                    "category": first["category"],
-                    "left_run_id": left["run_id"],
-                    "right_run_id": right["run_id"],
-                }
-            )
-    return matches
-
-
-def build_index(out_dir: Path, tasks: Sequence[Task]) -> tuple[int, int]:
-    """Rewrite the three index files from the run files. Returns (runs, matches)."""
+def build_index(out_dir: Path, tasks: Sequence[Task]) -> int:
+    """Rewrite the index files from the run files. Returns the number of runs."""
     headers = []
     for path in sorted((out_dir / "runs").glob("*.jsonl")):
         header = read_header(path)
-        headers.append({**header, "file": f"runs/{path.name}"})
-    matches = build_matches(headers)
+        # Runs recorded before takes existed are first takes.
+        headers.append({**header, "take": header.get("take", 1), "file": f"runs/{path.name}"})
     public_tasks = [task.public() for task in tasks]
 
     def dump(name: str, value: object) -> None:
         _atomic_write(out_dir / name, json.dumps(value, indent=2, ensure_ascii=False) + "\n")
 
     dump("runs-index.json", headers)
-    dump("matches.json", matches)
     dump("tasks.json", public_tasks)
-    return len(headers), len(matches)
+    return len(headers)
 
 
 def ordered(configs: Sequence[AgentConfig]) -> list[AgentConfig]:
@@ -167,14 +137,15 @@ async def record(
     run_one: RunOne,
     out_dir: Path,
     *,
+    take: int = 1,
     on_run: Callable[[AgentConfig, Task, RunResult], None] | None = None,
     retry_delay_s: float = RETRY_DELAY_S,
 ) -> RecordReport:
-    """Record every missing (config, task) pair, one run at a time."""
+    """Record every missing (config, task) pair of this take, one run at a time."""
     report = RecordReport()
     pairs = [(config, task) for config in ordered(configs) for task in tasks]
     for index, (config, task) in enumerate(pairs):
-        path = run_path(out_dir, config.name, task.id)
+        path = run_path(out_dir, config.name, task.id, take)
         if path.exists():
             report.skipped += 1
             continue
@@ -200,10 +171,10 @@ async def record(
             report.cause = stop
             report.detail = f"{config.name} on {task.id}"
             report.remaining = sum(
-                1 for c, t in pairs[index:] if not run_path(out_dir, c.name, t.id).exists()
+                1 for c, t in pairs[index:] if not run_path(out_dir, c.name, t.id, take).exists()
             )
             return report
 
-        write_run(path, run_header(config, task, result), result.events)
+        write_run(path, run_header(config, task, result, take), result.events)
         report.recorded.append(f"{config.name} on {task.id}")
     return report

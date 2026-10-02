@@ -138,3 +138,20 @@ Requests refused with HTTP 503 appear to count against the daily quota: `gemini-
 **Harness overhead, from a request captured during this recording** (`claude-haiku-full` on `writing-01`, first model call). The API counted 1,468 input tokens. The request held 3,667 characters of text, of which Claude Code added 767 (21%): a billing line (191), an identity line (62), and three reminder blocks giving the environment, the model's name, and the date (514). The arena's own content was the tool definitions (1,897 characters), the system prompt (573), and the task (430). Character counts are measured; a token count per part is not available without the tokenizer, so in tokens the harness share is an estimate of roughly 200 per model call, about a tenth of a typical run. It is the same for all three models, so it does not affect the comparison between them.
 
 **One thing the harness adds that matters for blind voting.** One reminder block tells the model its own name ("You are powered by the model named Haiku 4.5"). A model could repeat that in an answer. None did in these 90 runs: the leak scan over every blind match checks for each model's name.
+
+## 9. The second runs: how much one model varies from run to run
+
+**Recorded 2026-10-03.** A second run of every model on every task, same settings, for the impostor rounds. Actual cost $0.
+
+| Model      | Code and agent passed, run 1 / run 2 | Rules met (open-ended), run 1 / run 2 | Tokens, run 1 / run 2 |
+| ---------- | ------------------------------------ | ------------------------------------- | --------------------- |
+| Haiku 4.5  | 9 of 10 / 9 of 10                    | 85 of 101 / 97 of 101                 | 117,632 / 125,961     |
+| Sonnet 5.5 | 10 of 10 / 10 of 10                  | 98 of 101 / 97 of 101                 | 66,442 / 66,539       |
+| Opus 5.5   | 10 of 10 / 10 of 10                  | 96 of 101 / 96 of 101                 | 67,024 / 64,684       |
+
+- **Haiku's rule-keeping moved by twelve checks between two runs of the same thing.** Run 1 put it clearly behind the other two on open-ended tasks; run 2 puts it level with them. The site's totals use run 1, so they understate how close Haiku can be. One run per task is a thin basis for the open-ended comparison, and this is the evidence.
+- **Scores differed between the two runs on 14 of 90 model-task pairs:** 9 for Haiku, 3 for Sonnet, 2 for Opus.
+- **One run hit the token cap.** Haiku's second run of `agent-01` used 18,799 tokens and stopped at the 16,000 cap: it tried to read the data file by a full path that the sandbox does not have, and spent its budget on the errors. It is the only one of 180 runs that did not end by answering.
+- **A leak the tests caught.** That same run wrote the path of its working folder into a tool call, and the folder's name contained the harness's name. The blind view now replaces the folder name, and new runs use a neutral one. See DECISIONS.md.
+- **Two runs by one model can be word-for-word the same.** On some code tasks both of Opus's answers are identical, so an impostor round there shows the same letter twice. That is a fair clue, not a bug.
+- **Usage.** The 90 runs took about 9 minutes and did not reach a subscription usage limit.

@@ -190,36 +190,49 @@ def test_credentials_are_scrubbed_from_what_is_written(tmp_path: Path) -> None:
     assert token not in path.read_text(encoding="utf-8")
 
 
-async def test_the_index_pairs_every_two_configs_on_every_task(tmp_path: Path) -> None:
+async def test_the_index_lists_every_run_and_only_public_task_fields(tmp_path: Path) -> None:
     await record(CONFIGS, TASKS, Runs(), tmp_path)
 
-    runs, matches = build_index(tmp_path, TASKS)
-    listed = json.loads((tmp_path / "matches.json").read_text(encoding="utf-8"))
+    runs = build_index(tmp_path, TASKS)
     index = json.loads((tmp_path / "runs-index.json").read_text(encoding="utf-8"))
     tasks = json.loads((tmp_path / "tasks.json").read_text(encoding="utf-8"))
 
-    assert (runs, matches) == (6, 6)
-    assert len({match["id"] for match in listed}) == 6
-    by_run = {row["run_id"]: row for row in index}
-    for match in listed:
-        left, right = by_run[match["left_run_id"]], by_run[match["right_run_id"]]
-        assert left["task_id"] == right["task_id"] == match["task_id"]
-        assert left["config_name"] != right["config_name"]
-        # A match id must not name the configs it compares.
-        assert "claude" not in match["id"]
+    assert runs == 6
+    assert {row["take"] for row in index} == {1}
+    assert all(row["file"] == f"runs/{row['config_name']}__{row['task_id']}.jsonl" for row in index)
     assert all("scorer_config" not in task and "examples" not in task for task in tasks)
-    # Rebuilding gives the same matches and the same sides.
+
+
+async def test_a_second_take_is_recorded_beside_the_first(tmp_path: Path) -> None:
+    await record(CONFIGS[:1], TASKS, Runs(), tmp_path)
+    second = Runs()
+
+    report = await record(CONFIGS[:1], TASKS, second, tmp_path, take=2)
+
+    # The first takes do not count as done for the second.
+    assert second.calls == ["claude-opus-full/t-1", "claude-opus-full/t-2"]
+    assert report.skipped == 0
+    assert run_path(tmp_path, "claude-opus-full", "t-1", 2).name == "claude-opus-full__t-1__2.jsonl"
+    assert read_header(run_path(tmp_path, "claude-opus-full", "t-1", 2))["take"] == 2
+    assert read_header(run_path(tmp_path, "claude-opus-full", "t-1"))["take"] == 1
+
+    again = Runs()
+    resumed = await record(CONFIGS[:1], TASKS, again, tmp_path, take=2)
+    assert again.calls == []
+    assert resumed.skipped == 2
+
+    assert build_index(tmp_path, TASKS) == 4
+    index = json.loads((tmp_path / "runs-index.json").read_text(encoding="utf-8"))
+    assert sorted(row["take"] for row in index) == [1, 1, 2, 2]
+
+
+def test_a_run_recorded_before_takes_existed_is_a_first_take(tmp_path: Path) -> None:
+    write_run(tmp_path / "runs" / "old__t-1.jsonl", {"record": "run", "run_id": "r"}, [])
+
     build_index(tmp_path, TASKS)
-    assert json.loads((tmp_path / "matches.json").read_text(encoding="utf-8")) == listed
 
-
-async def test_a_partial_recording_only_makes_matches_that_have_both_runs(tmp_path: Path) -> None:
-    await record(CONFIGS[:2], TASKS[:1], Runs(), tmp_path)
-    await record(CONFIGS[2:], TASKS, Runs(), tmp_path)
-
-    _runs, matches = build_index(tmp_path, TASKS)
-
-    assert matches == 3
+    index = json.loads((tmp_path / "runs-index.json").read_text(encoding="utf-8"))
+    assert index[0]["take"] == 1
 
 
 def test_thinking_is_kept_apart_from_the_reply() -> None:

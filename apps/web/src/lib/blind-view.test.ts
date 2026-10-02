@@ -3,17 +3,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   BLIND_TIMESTAMP,
-  blindSides,
   blindView,
   REDACTED_ERROR_MESSAGE,
   redactEvent,
-  sideAlias,
+  hasVisibleWork,
+  pausedView,
+  seatAlias,
+  SUBMIT_ANSWER,
   summarizeBlindSide,
 } from "@/lib/blind-view";
 import { findLeaks } from "@/test/leak-scan";
 import { identifyingStrings, leftRun, recordedRun, rightRun } from "@/test/trace-fixtures";
 
-const MATCH_ID = "01JMATCH000000000000000000";
+const ROUND_ID = "dr.0123456789abcdef";
+const ALIAS = seatAlias(ROUND_ID, "A");
 const secrets = [...identifyingStrings(leftRun), ...identifyingStrings(rightRun)];
 
 const baseOptions = {
@@ -64,7 +67,7 @@ describe("the leak scan itself", () => {
 });
 
 describe("blind view of one run", () => {
-  const blind = blindView(leftRun.events, MATCH_ID, "left");
+  const blind = blindView(leftRun.events, ALIAS);
 
   it("leaks nothing", () => {
     expect(findLeaks(blind, secrets)).toEqual([]);
@@ -77,11 +80,11 @@ describe("blind view of one run", () => {
     expect(blind.map((event) => event.seq)).toEqual(blind.map((_, index) => index));
   });
 
-  it("marks every event as redacted and replaces the run id with a match-scoped alias", () => {
+  it("marks every event as redacted and replaces the run id with a seat alias", () => {
     for (const event of blind) {
       expect(event.redacted).toBe(true);
-      expect(event.side).toBe("left");
-      expect(event.run_id).toBe(sideAlias(MATCH_ID, "left"));
+      expect(event.side).toBeNull();
+      expect(event.run_id).toBe("dr.0123456789abcdef:A");
     }
   });
 
@@ -130,7 +133,7 @@ describe("blind view of one run", () => {
   it("does not modify the stored events", () => {
     const before = JSON.stringify(leftRun.events);
 
-    blindView(leftRun.events, MATCH_ID, "left");
+    blindView(leftRun.events, ALIAS);
 
     expect(JSON.stringify(leftRun.events)).toBe(before);
   });
@@ -141,7 +144,7 @@ describe("redaction rules", () => {
     "hides the %s stop reason",
     (stopReason) => {
       const run = recordedRun({ ...baseOptions, stopReason });
-      const [finished] = only(blindView(run.events, MATCH_ID, "right"), "run_finished");
+      const [finished] = only(blindView(run.events, ALIAS), "run_finished");
 
       expect(finished.payload.stop_reason).toBeNull();
     },
@@ -149,13 +152,13 @@ describe("redaction rules", () => {
 
   it.each(["answered", "max_steps", "error"] as const)("keeps the %s stop reason", (stopReason) => {
     const run = recordedRun({ ...baseOptions, stopReason });
-    const [finished] = only(blindView(run.events, MATCH_ID, "right"), "run_finished");
+    const [finished] = only(blindView(run.events, ALIAS), "run_finished");
 
     expect(finished.payload.stop_reason).toBe(stopReason);
   });
 
   it("replaces an error's text, which can name the model", () => {
-    const blind = blindView(rightRun.events, MATCH_ID, "right");
+    const blind = blindView(rightRun.events, ALIAS);
     const [error] = only(blind, "error");
 
     expect(error.payload.message).toBe(REDACTED_ERROR_MESSAGE);
@@ -167,49 +170,127 @@ describe("redaction rules", () => {
     const score = leftRun.events.find((event) => event.type === "score_computed");
 
     expect(score).toBeDefined();
-    expect(redactEvent(score!, MATCH_ID, "left")).toBeNull();
+    expect(redactEvent(score!, ALIAS)).toBeNull();
   });
 });
 
-describe("both sides as sent before a vote", () => {
-  const payload = blindSides(MATCH_ID, { left: leftRun.events, right: rightRun.events });
-  const serialized = JSON.stringify(payload);
+describe("a run paused before its final answer", () => {
+  // The fixture run, with a final step that submits the answer through the control tool.
+  const [firstCall] = only(leftRun.events, "llm_call");
+  const finished = only(leftRun.events, "run_finished")[0];
+  const submitting: TraceEvent[] = [
+    ...leftRun.events.filter((event) => event.seq < finished.seq),
+    {
+      ...firstCall,
+      seq: finished.seq,
+      payload: {
+        ...firstCall.payload,
+        step: 2,
+        output: {
+          content: "The total is 179.45.",
+          thinking: null,
+          tool_calls: [{ call_id: "c2", tool: SUBMIT_ANSWER, arguments: { answer: "179.45" } }],
+          truncated: false,
+        },
+      },
+    },
+    {
+      ...finished,
+      seq: finished.seq + 1,
+      type: "tool_call",
+      payload: { step: 2, call_id: "c2", tool: SUBMIT_ANSWER, arguments: { answer: "179.45" } },
+    },
+    { ...finished, seq: finished.seq + 2 },
+  ];
+  const paused = pausedView(submitting, ALIAS);
 
-  it("never contains model names, config names, cost, tokens, speed, thinking, or pass/fail", () => {
-    expect(findLeaks(payload, secrets)).toEqual([]);
+  it("removes the answer from the final reply, the submit call, and the last event", () => {
+    const calls = only(paused, "llm_call");
+    const last = calls[calls.length - 1];
+    const submit = only(paused, "tool_call").find((event) => event.payload.tool === SUBMIT_ANSWER);
+
+    expect(last.payload.output.content).toBeNull();
+    expect(last.payload.output.tool_calls[0].arguments).toEqual({});
+    expect(submit?.payload.arguments).toEqual({});
+    expect(only(paused, "run_finished")[0].payload.final_answer).toBeNull();
+    // 179.45 is also the calculator's output, which the player is meant to see.
+    expect(JSON.stringify(paused)).not.toContain("The total is 179.45");
+    expect(JSON.stringify(paused)).not.toContain('"answer"');
   });
 
-  it("does not contain the identifying strings anywhere in the serialized JSON", () => {
-    for (const secret of secrets) {
-      expect(serialized.toLowerCase()).not.toContain(secret.toLowerCase());
-    }
-    expect(serialized).not.toContain("score_computed");
-    expect(serialized).not.toContain('"passed"');
-    expect(serialized).not.toContain("2026-10-02");
+  it("keeps the work done before the answer", () => {
+    const [first] = only(paused, "llm_call");
+    const [work] = only(paused, "tool_call");
+
+    expect(first.payload.output.content).toBe("I will compute it.");
+    expect(work.payload.tool).toBe("calculator");
+    expect(work.payload.arguments).toEqual({ expression: "37*4.85" });
   });
 
-  it("carries only the step count and the answer as the summary", () => {
-    expect(payload.left.summary).toEqual({ finished: true, steps: 2, final_answer: "179.45" });
-    expect(Object.keys(payload.right.summary).sort()).toEqual([
-      "final_answer",
-      "finished",
-      "steps",
-    ]);
+  it("is still blind in every other respect", () => {
+    expect(findLeaks(paused, secrets)).toEqual([]);
   });
 
-  it("keeps the two sides apart", () => {
-    expect(new Set(payload.left.events.map((event) => event.run_id))).toEqual(
-      new Set([sideAlias(MATCH_ID, "left")]),
+  it("hides a plain-text answer given without the submit tool", () => {
+    const plain = pausedView(
+      [
+        {
+          ...firstCall,
+          payload: {
+            ...firstCall.payload,
+            output: {
+              content: "Dear Sir, the answer.",
+              thinking: null,
+              tool_calls: [],
+              truncated: false,
+            },
+          },
+        },
+        finished,
+      ],
+      ALIAS,
     );
-    expect(new Set(payload.right.events.map((event) => event.run_id))).toEqual(
-      new Set([sideAlias(MATCH_ID, "right")]),
-    );
+
+    expect(JSON.stringify(plain)).not.toContain("Dear Sir");
+  });
+});
+
+describe("the agent's working folder", () => {
+  it("has its name, which names the harness, replaced wherever an agent wrote it", () => {
+    const [call] = only(leftRun.events, "tool_call");
+    const [result] = only(leftRun.events, "tool_result");
+    const path = "/tmp/arena-claude-6dnni_hc/sensor_readings.csv";
+    const events: TraceEvent[] = [
+      { ...call, payload: { ...call.payload, arguments: { code: `open('${path}')` } } },
+      { ...result, payload: { ...result.payload, output: `No such file: ${path}` } },
+    ];
+
+    const blind = JSON.stringify(blindView(events, ALIAS));
+
+    expect(blind).not.toContain("arena-claude");
+    expect(blind).toContain("/tmp/workdir/sensor_readings.csv");
+    // The stored trace is untouched.
+    expect(JSON.stringify(events)).toContain("arena-claude-6dnni_hc");
+  });
+});
+
+describe("visible work", () => {
+  it("is a tool call other than the submission", () => {
+    const [call] = only(leftRun.events, "tool_call");
+    const submit: TraceEvent = {
+      ...call,
+      payload: { ...call.payload, tool: SUBMIT_ANSWER, arguments: { answer: "x" } },
+    };
+
+    expect(hasVisibleWork(leftRun.events)).toBe(true);
+    expect(hasVisibleWork([submit])).toBe(false);
+    expect(hasVisibleWork([])).toBe(false);
   });
 });
 
 describe("summary of a run still in progress", () => {
   it("reports the step reached and no answer", () => {
-    const partial = blindView(leftRun.events.slice(0, 4), MATCH_ID, "left");
+    const partial = blindView(leftRun.events.slice(0, 4), ALIAS);
 
     expect(summarizeBlindSide(partial)).toEqual({ finished: false, steps: 1, final_answer: null });
   });

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" role="img" aria-label="Dr. Felix Ambrose, flustered">
+  <rect width="200" height="240" fill="#4A2430"/>
+  <g stroke="#C9A08A" stroke-width="1" opacity="0.28"><line x1="100" y1="150" x2="-67.4" y2="120.5"/><line x1="100" y1="150" x2="-52.8" y2="75.5"/><line x1="100" y1="150" x2="-26.3" y2="36.2"/><line x1="100" y1="150" x2="9.9" y2="5.8"/><line x1="100" y1="150" x2="53.1" y2="-13.4"/><line x1="100" y1="150" x2="100.0" y2="-20.0"/><line x1="100" y1="150" x2="146.9" y2="-13.4"/><line x1="100" y1="150" x2="190.1" y2="5.8"/><line x1="100" y1="150" x2="226.3" y2="36.2"/><line x1="100" y1="150" x2="252.8" y2="75.5"/><line x1="100" y1="150" x2="267.4" y2="120.5"/></g>
+      <path d="M62 100 q-4 -44 38 -44 q42 0 38 44 q-8 -26 -30 -28 q-10 12 -46 28 z" fill="#2A141A" stroke="#2A141A" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M22 240 q4 -62 64 -74 h28 q60 12 64 74 z" fill="#3A1A22" stroke="#2A141A" stroke-width="2.5"/>
+      <path d="M86 166 l14 22 l14 -22 z" fill="#F0E4D4" stroke="#2A141A" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M96 186 h8 l4 40 l-8 10 l-8 -10 z" fill="#C9A08A" stroke="#2A141A" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M86 144 v22 h28 v-22 z" fill="#D6C8A8" stroke="#2A141A" stroke-width="2.5"/>
+  <ellipse cx="100" cy="108" rx="36" ry="43" fill="#E2D6BC" stroke="#2A141A" stroke-width="2.5"/>
+  <path d="M100 108 l-4 14 h7" stroke="#2A141A" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M79 95 l14 -5" stroke="#2A141A" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+        <path d="M121 95 l-14 -5" stroke="#2A141A" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+        <circle cx="89" cy="105" r="2.6" fill="#2A141A"/>
+        <circle cx="117" cy="105" r="2.6" fill="#2A141A"/>
+        <ellipse cx="80" cy="120" rx="8" ry="4.5" fill="#E59A8F" opacity="0.75"/>
+        <ellipse cx="120" cy="120" rx="8" ry="4.5" fill="#E59A8F" opacity="0.75"/>
+        <path d="M88 134 q4 -5 8 0 t8 0 t8 0" stroke="#2A141A" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+        <path d="M134 82 q5 9 0 13 q-5 -4 0 -13 z" fill="#F0E4D4" stroke="#2A141A" stroke-width="1.5"/>
+      <g fill="none" stroke="#2A141A" stroke-width="2.4">
+        <circle cx="86" cy="104" r="11"/><circle cx="114" cy="104" r="11"/>
+        <path d="M97 104 h6 M75 102 l-11 -4 M125 102 l11 -4"/>
+      </g>
+</svg>

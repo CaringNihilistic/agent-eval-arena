@@ -2,129 +2,235 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * Design tokens for "Poison Pen: A Wrenfield Hall Mystery".
+ * Every colour, font, and ornament measure in the site is defined here.
+ * Components use the tokens (or the Tailwind names mapped to them below) and
+ * never a literal value. src/test/theme-contrast.test.ts checks the text and
+ * background pairs listed there against WCAG AA.
+ */
+:root {
+  /* Rooms: the dark surfaces. */
+  --claret: #3a1a22;
+  --panel: #4a2430;
+  --line: #6a3a47;
+
+  /* Paper: letters and cards. */
+  --parchment: #e2d6bc;
+  --parchment-shade: #d6c8a8;
+  --parchment-rule: #8a745a;
+  --ink: #2a141a;
+  --ink-muted: #5f4a3e;
+
+  /* Text on the dark surfaces. */
+  --text: #f0e4d4;
+  --text-secondary: #dccabd;
+  --text-muted: #cdb6aa;
+
+  /* Accents. */
+  --sage: #a9c0a0;
+  --sage-hover: #bccfb4;
+  --rose: #c9a08a;
+  --stamp: #9c2f2b;
+  --stamp-on-dark: #e59a8f;
+
+  /* Ornament measures. */
+  --pinstripe: rgba(201, 160, 138, 0.05);
+  --pinstripe-width: 2px;
+  --pinstripe-gap: 46px;
+  --inset-rule: 6px;
+  --step: 7px;
+  --radius: 0.125rem;
+
+  /* The names shadcn components read, on a dark surface. */
+  --background: var(--claret);
+  --foreground: var(--text);
+  --card: var(--panel);
+  --card-foreground: var(--text);
+  --popover: var(--panel);
+  --popover-foreground: var(--text);
+  --primary: var(--sage);
+  --primary-foreground: var(--ink);
+  --secondary: var(--panel);
+  --secondary-foreground: var(--text);
+  --muted: var(--panel);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--panel);
+  --accent-foreground: var(--text);
+  --destructive: var(--stamp-on-dark);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--rose);
+  /* Rules and outlines that decorate: rose on dark, a brown rule on paper. */
+  --ornament: var(--rose);
+  /* Stamps and accusations. */
+  --accusation: var(--stamp-on-dark);
+}
+
+/* On paper the same names point at ink, so any component placed on a letter or
+   a card keeps its contrast without knowing where it is. */
+.on-parchment,
+.parchment {
+  --background: var(--parchment);
+  --foreground: var(--ink);
+  --card: var(--parchment);
+  --card-foreground: var(--ink);
+  --muted: var(--parchment-shade);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--parchment-shade);
+  --accent-foreground: var(--ink);
+  --destructive: var(--stamp);
+  --border: var(--parchment-rule);
+  --ring: var(--stamp);
+  --ornament: var(--parchment-rule);
+  --accusation: var(--stamp);
+  background-color: var(--parchment);
+  color: var(--ink);
+}
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-ornament: var(--ornament);
+  --color-accusation: var(--accusation);
+  --color-claret: var(--claret);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-parchment: var(--parchment);
+  --color-parchment-shade: var(--parchment-shade);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-text-secondary: var(--text-secondary);
+  --color-sage: var(--sage);
+  --color-sage-hover: var(--sage-hover);
+  --color-rose: var(--rose);
+  --color-stamp: var(--stamp);
+  --color-stamp-on-dark: var(--stamp-on-dark);
+
+  --font-sans: var(--font-body);
+  --font-title: var(--font-limelight);
+  --font-body: var(--font-baskerville);
+  --font-label: var(--font-josefin);
+  --font-mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  --font-heading: var(--font-title);
+
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --radius-xl: var(--radius);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
-    @apply font-sans;
+    font-family: var(--font-baskerville), Georgia, serif;
+  }
+  body {
+    @apply text-foreground;
+    background-color: var(--claret);
+    /* Pinstripes: hard-edged stripes, not a colour gradient. */
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--pinstripe) 0,
+      var(--pinstripe) var(--pinstripe-width),
+      transparent var(--pinstripe-width),
+      transparent var(--pinstripe-gap)
+    );
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Titles: Limelight. */
+  .deco-title {
+    font-family: var(--font-limelight), "Times New Roman", serif;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
+  }
+
+  /* Labels: Josefin Sans 600, uppercase, widely spaced. */
+  .deco-label {
+    font-family: var(--font-josefin), "Trebuchet MS", sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  /* A letter or card on paper, with a double-line inset border. */
+  .parchment {
+    border: 1px solid var(--parchment-rule);
+    outline: 1px solid var(--parchment-rule);
+    outline-offset: calc(var(--inset-rule) * -1);
+    padding: calc(var(--inset-rule) * 3);
+  }
+
+  /* A letter's own words are set in italic. */
+  .letter-hand {
+    font-style: italic;
+  }
+
+  /* Art Deco stepped corners, used around portraits. */
+  .stepped {
+    --s: var(--step);
+    clip-path: polygon(
+      calc(var(--s) * 2) 0,
+      calc(100% - var(--s) * 2) 0,
+      calc(100% - var(--s) * 2) var(--s),
+      calc(100% - var(--s)) var(--s),
+      calc(100% - var(--s)) calc(var(--s) * 2),
+      100% calc(var(--s) * 2),
+      100% calc(100% - var(--s) * 2),
+      calc(100% - var(--s)) calc(100% - var(--s) * 2),
+      calc(100% - var(--s)) calc(100% - var(--s)),
+      calc(100% - var(--s) * 2) calc(100% - var(--s)),
+      calc(100% - var(--s) * 2) 100%,
+      calc(var(--s) * 2) 100%,
+      calc(var(--s) * 2) calc(100% - var(--s)),
+      var(--s) calc(100% - var(--s)),
+      var(--s) calc(100% - var(--s) * 2),
+      0 calc(100% - var(--s) * 2),
+      0 calc(var(--s) * 2),
+      var(--s) calc(var(--s) * 2),
+      var(--s) var(--s),
+      calc(var(--s) * 2) var(--s)
+    );
+  }
+
+  /* A rubber stamp: an accusation, a verdict. */
+  .deco-stamp {
+    font-family: var(--font-josefin), "Trebuchet MS", sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--accusation);
+    border: 2px solid var(--accusation);
+    padding: 0.25rem 0.6rem;
+    display: inline-block;
+    transform: rotate(-2deg);
   }
 }

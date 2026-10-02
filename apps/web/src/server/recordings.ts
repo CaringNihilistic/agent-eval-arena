@@ -1,21 +1,24 @@
 // Reads the recorded runs and Anthropic's published scores from the repository's
 // data folder. Server only: the files hold scores and config names, which a
-// voter must not receive before voting.
+// player must not receive before deciding.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { TraceEvent } from "@arena/schema";
 
+import { hasVisibleWork } from "@/lib/blind-view";
 import type { ConfigInfo } from "@/lib/leaderboard";
-import type { MatchRecord, OfficialBenchmarks, PublicTask, RunHeader } from "@/lib/types";
+import { buildCatalog, type Catalog } from "@/lib/rounds";
+import type { OfficialBenchmarks, PublicTask, RunHeader } from "@/lib/types";
 
 export interface Recordings {
   runs: ReadonlyMap<string, RunHeader>;
-  matches: ReadonlyMap<string, MatchRecord>;
   tasks: ReadonlyMap<string, PublicTask>;
   configs: readonly ConfigInfo[];
   official: OfficialBenchmarks;
+  /** Everything that can be dealt as a round. */
+  catalog: Catalog;
   events(runId: string): TraceEvent[];
 }
 
@@ -37,9 +40,13 @@ export function parseRunFile(text: string): TraceEvent[] {
     .map((line) => JSON.parse(line) as TraceEvent);
 }
 
-export function loadRecordings(root: string = dataDir()): Recordings {
-  const folder = join(root, "recordings");
-  const headers = readJson<RunHeader[]>(join(folder, "runs-index.json"));
+/** Assemble the recordings from their parts. Tests use this with fixtures. */
+export function makeRecordings(
+  headers: readonly RunHeader[],
+  tasks: readonly PublicTask[],
+  official: OfficialBenchmarks,
+  events: (runId: string) => TraceEvent[],
+): Recordings {
   const runs = new Map(headers.map((run) => [run.run_id, run]));
   const configs = new Map<string, ConfigInfo>();
   for (const run of headers) {
@@ -49,28 +56,43 @@ export function loadRecordings(root: string = dataDir()): Recordings {
       model: run.model,
     });
   }
-  const eventCache = new Map<string, TraceEvent[]>();
+  const watchable = new Set(
+    headers.filter((run) => hasVisibleWork(events(run.run_id))).map((run) => run.run_id),
+  );
   return {
     runs,
-    matches: new Map(
-      readJson<MatchRecord[]>(join(folder, "matches.json")).map((match) => [match.id, match]),
-    ),
-    tasks: new Map(
-      readJson<PublicTask[]>(join(folder, "tasks.json")).map((task) => [task.id, task]),
-    ),
+    tasks: new Map(tasks.map((task) => [task.id, task])),
     configs: [...configs.values()].sort((a, b) => a.id.localeCompare(b.id)),
-    official: readJson<OfficialBenchmarks>(join(root, "official-benchmarks.json")),
-    events(runId) {
-      const run = runs.get(runId);
-      if (!run) throw new Error(`No recorded run ${runId}`);
-      let events = eventCache.get(runId);
-      if (!events) {
-        events = parseRunFile(readFileSync(join(folder, run.file), "utf8"));
-        eventCache.set(runId, events);
-      }
-      return events;
-    },
+    official,
+    catalog: buildCatalog(headers, watchable),
+    events,
   };
+}
+
+export function loadRecordings(root: string = dataDir()): Recordings {
+  const folder = join(root, "recordings");
+  const headers = readJson<RunHeader[]>(join(folder, "runs-index.json")).map((run) => ({
+    ...run,
+    take: run.take ?? 1,
+  }));
+  const files = new Map(headers.map((run) => [run.run_id, run.file]));
+  const cache = new Map<string, TraceEvent[]>();
+  const events = (runId: string): TraceEvent[] => {
+    const file = files.get(runId);
+    if (!file) throw new Error(`No recorded run ${runId}`);
+    let loaded = cache.get(runId);
+    if (!loaded) {
+      loaded = parseRunFile(readFileSync(join(folder, file), "utf8"));
+      cache.set(runId, loaded);
+    }
+    return loaded;
+  };
+  return makeRecordings(
+    headers,
+    readJson<PublicTask[]>(join(folder, "tasks.json")),
+    readJson<OfficialBenchmarks>(join(root, "official-benchmarks.json")),
+    events,
+  );
 }
 
 let cached: Recordings | undefined;

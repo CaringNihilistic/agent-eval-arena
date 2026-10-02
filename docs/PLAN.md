@@ -1,6 +1,6 @@
 # Agent Eval Arena: Plan
 
-Status: revised 2026-10-03. Checkpoint B is complete; Checkpoint B2 (the Poison Pen game, Section 0.1) is in progress. **Sections 0 and 0.1 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
+Status: revised 2026-10-03. Checkpoints B and B2 are complete: 180 runs are recorded and the Poison Pen game (Section 0.1) works locally in all five modes. **Sections 0 and 0.1 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
 
 Where this plan departs from the brief, the departure is listed in [Section 12](#12-deviations-from-the-brief) and the reason is in `DECISIONS.md`.
 
@@ -26,7 +26,7 @@ Where this plan departs from the brief, the departure is listed in [Section 12](
 
 **Rendering model output.** Final answers render as markdown with `react-markdown` and `remark-gfm`, with no raw-HTML plugin, so HTML in an answer is shown as text. Diagram answers are drawn with Mermaid at `securityLevel: "strict"`; if drawing fails the source is shown as text. A test feeds a `<script>` tag, an `onerror` attribute, and a `javascript:` link through both.
 
-**Not built yet.** Live mode and the Python run API (dropped unless the owner wants them back), the React Flow graph view, run permalinks, the Playwright end-to-end test, Open Graph images, the theme, the README results section, and deployment.
+**Not built yet.** Live mode and the Python run API (dropped unless the owner wants them back), the React Flow graph view, run permalinks, Open Graph images, the README results section, and deployment. The theme and the Playwright test arrived with Checkpoint B2 (Section 0.1).
 
 ## 0.1 Checkpoint B2: "Poison Pen: A Wrenfield Hall Mystery"
 
@@ -82,7 +82,7 @@ Confidence ("A hunch", "Fairly sure", "Certain") is chosen before every submissi
 | The Morning Post         | Five rounds, the same for everyone on a given UTC date: author, timetable, duel, author, timetable. The result is shared as squares, for example `Poison Pen · Morning Post No. 14 ■■□■■`                                                                                     | No                |
 
 - **Difficulty in the Weekend.** Rounds 1 to 4 use clear differences; rounds 5 to 10 use close matches and traps. A pair is _close_ when the two runs have the same score and their lengths are within 25% of the longer; otherwise _clear_. For an author round, the letter is _clear_ when its run differs in that way from both other models' runs on the task. The first duel is never a trap; each of the other two is a trap with probability 5/8, which makes about 1 round in 8 a trap.
-- **Timetable rounds need something to watch.** Only runs that used a tool before answering are eligible, because a run that answers in one step shows nothing before its final answer. That is 27 of the first 90 runs (17 of them Haiku), and 21 of the 27 hold. Flagged to the owner: the pool is small, leans to one model, and "It holds" is right about three times in four.
+- **Timetable rounds need something to watch.** Only runs that used a tool before answering are eligible, because a run that answers in one step shows nothing before its final answer. With both takes that is 50 of 180 runs: 30 by Haiku, 10 each by Sonnet and Opus. 42 of the 50 hold. Flagged to the owner: the pool leans to one model, and "It holds" is right about five times in six.
 - **In a duel inside the Morning Post**, the square is filled when the player accused a trap or did not accuse a non-trap.
 
 ### Seeds and round ids
@@ -117,6 +117,17 @@ Pages: the Lobby (`/`), The Guest List (`/guests`), `/drawing-room`, `/library`,
 | `GET /api/art`                                          | Which portrait files exist, so dropped-in PNGs replace the SVGs with no code change |
 
 Postgres: `decisions` replaces `votes` (one row per voter per round, with the fields listed under the fairness rules), plus `shares` and `challenges`. Match building moves from the Python index builder to TypeScript round generation; `matches.json` is no longer written.
+
+### What B2 built, and what it did not
+
+Built: everything in this section. Tested by 229 unit, component, and service tests (five of them against Postgres) and a Playwright test that plays a round of every mode in a real browser against a production build.
+
+Not built, or built more simply than the brief might suggest:
+
+- **Difficulty for timetable rounds.** There is no clear or close for a single paused run, so they are dealt at random in every position of a Weekend.
+- **Swipe.** On a phone the Library Gathering uses tabs to move between the three letters; there is no swipe gesture.
+- **Portraits** are simple generated drawings, as the brief allows, waiting for illustrations.
+- **Open Graph images, run permalinks, the React Flow graph view, deployment.** Unchanged from before B2: not built.
 
 ### Theme
 
@@ -654,12 +665,13 @@ Railway and Fly.io are dropped.
 
 The original ten phases were regrouped into checkpoints on 2026-10-02.
 
-| Step          | Deliverable                                                                                                                                                                                                                              | State       |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| Phases 0 to 3 | Plan, scaffold, runner and tracing, Claude backend, task bank and scorers                                                                                                                                                                | Done        |
-| Checkpoint A  | Six-category task bank, constraint scoring, Mermaid parsing in the sandbox, four-run pilot                                                                                                                                               | Done        |
-| Checkpoint B  | Three configs; blind view hides thinking and time; `arena record`; all 90 runs recorded; replay site with matches, blind voting, reveal with official benchmarks, three-ranking leaderboard, `/about`; votes and rate limits in Postgres | Done        |
-| Next          | README with measured results; deploy to Vercel Hobby and Neon Free; Playwright end-to-end test; theme and mobile polish; graph view and run permalinks if still wanted                                                                   | Not started |
+| Step          | Deliverable                                                                                                                                                                                                                                                   | State       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Phases 0 to 3 | Plan, scaffold, runner and tracing, Claude backend, task bank and scorers                                                                                                                                                                                     | Done        |
+| Checkpoint A  | Six-category task bank, constraint scoring, Mermaid parsing in the sandbox, four-run pilot                                                                                                                                                                    | Done        |
+| Checkpoint B  | Three configs; blind view hides thinking and time; `arena record`; all 90 runs recorded; replay site with matches, blind voting, reveal with official benchmarks, three-ranking leaderboard, `/about`; votes and rate limits in Postgres                      | Done        |
+| Checkpoint B2 | "Poison Pen": second runs recorded (180 in all); five modes; guests and seats dealt at random; accusations, confidence, traps; reveal; points, ranks, distinctions, Casebook, challenges; costume and position bias; the theme; Playwright test of every mode | Done        |
+| Next          | README with measured results; deploy to Vercel Hobby and Neon Free; proper guest illustrations; graph view and run permalinks if still wanted                                                                                                                 | Not started |
 
 Checkpoint B acceptance, all met: every recorded match is served blind with no withheld field or identifying string (tested over all 90); a vote is stored once per voter per match with both sides' pass state and answer lengths; rate-limit counters persist across a restart (tested against Postgres); Elo matches hand-computed examples and the bootstrap is deterministic under a fixed seed; a model answer containing `<script>` or `onerror` renders as text; a browser walkthrough of start, replay, vote, reveal, and leaderboard works locally.
 

@@ -230,6 +230,10 @@ def record_bank(
     index_only: Annotated[
         bool, typer.Option("--index-only", help="Rebuild the index files and run nothing")
     ] = False,
+    take: Annotated[
+        int,
+        typer.Option(min=1, max=2, help="1 for the first run of each pair, 2 for the second"),
+    ] = 1,
 ) -> None:
     """Record every missing (config, task) run into data/recordings/, then rebuild the index.
 
@@ -240,8 +244,7 @@ def record_bank(
     out_dir = settings.recordings_dir
     bank = load_bank(settings.tasks_dir)
     if index_only:
-        runs, matches = build_index(out_dir, list(bank.values()))
-        typer.echo(f"index rebuilt: {runs} runs, {matches} matches")
+        typer.echo(f"index rebuilt: {build_index(out_dir, list(bank.values()))} runs")
         return
     configs = load_configs(settings.configs_dir)
     unknown = [name for name in config or [] if name not in configs]
@@ -266,14 +269,16 @@ def record_bank(
 
     typer.echo(f"{'config':<20} {HEADER}")
     try:
-        report = asyncio.run(record(chosen_configs, chosen_tasks, run_one, out_dir, on_run=show))
+        report = asyncio.run(
+            record(chosen_configs, chosen_tasks, run_one, out_dir, take=take, on_run=show)
+        )
     except (ModelNotAllowedError, BackendUnavailableError, SubscriptionAuthError) as error:
         typer.echo(f"Refused: {error}", err=True)
         raise typer.Exit(3) from error
-    runs, matches = build_index(out_dir, list(bank.values()))
+    runs = build_index(out_dir, list(bank.values()))
     typer.echo(
         f"recorded {len(report.recorded)}, already had {report.skipped}, "
-        f"still missing {report.remaining}; index: {runs} runs, {matches} matches"
+        f"still missing {report.remaining}; index: {runs} runs"
     )
     if report.cause == "usage_limit":
         resets = (

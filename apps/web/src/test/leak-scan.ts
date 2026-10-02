@@ -28,7 +28,14 @@ export const WITHHELD_KEYS = [
   "wall_clock_ms",
   "answer_words",
   "official",
-  "tallies",
+  "take",
+  "holds",
+  "totals",
+  "trap",
+  "crowd",
+  "progress",
+  "outcome",
+  "your_answer",
 ] as const;
 
 export interface Leak {
