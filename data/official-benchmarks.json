@@ -1,0 +1,185 @@
+{
+  "checked": "2026-10-02",
+  "note": "Scores published by Anthropic, copied from the pages listed under sources. They measure different tasks from this arena's, under different settings (higher effort, thinking on), so they are shown for comparison and are not part of any arena score.",
+  "sources": {
+    "opus-5-5": {
+      "title": "Introducing Claude Opus 5.5",
+      "url": "https://www.anthropic.com/claude-opus-5-5",
+      "published": "2026-09-22",
+      "conditions": "Unless otherwise noted, all Claude Opus 5.5 results use adaptive thinking at max effort."
+    },
+    "sonnet-5-5": {
+      "title": "Introducing Claude Sonnet 5.5",
+      "url": "https://www.anthropic.com/claude-sonnet-5-5",
+      "published": "2026-09-28",
+      "conditions": "Terminal-Bench 4.0 results are reported for Claude Opus 5.5 at Xhigh effort. For details, the page refers to the Sonnet 5.5 System Card."
+    },
+    "haiku-4-5": {
+      "title": "Introducing Claude Haiku 4.5",
+      "url": "https://www.anthropic.com/news/claude-haiku-4-5",
+      "published": "2025-10-15",
+      "conditions": "The SWE-bench Verified score was averaged over 50 trials, no test-time compute, 128K thinking budget. Anthropic has published no score for Haiku 4.5 on any benchmark it reports for Opus 5.5 or Sonnet 5.5."
+    }
+  },
+  "benchmarks": [
+    {
+      "id": "terminal-bench-4.0",
+      "name": "Terminal-Bench 4.0",
+      "area": "Agentic coding",
+      "scores": [
+        {
+          "model": "claude-sonnet-5-5",
+          "value": 70.6,
+          "display": "70.6%",
+          "source": "sonnet-5-5"
+        },
+        {
+          "model": "claude-opus-5-5",
+          "value": 66.4,
+          "display": "66.4%",
+          "source": "sonnet-5-5",
+          "note": "Xhigh effort; standard error ±2.6 pts"
+        }
+      ]
+    },
+    {
+      "id": "frontiercode-1.1-main",
+      "name": "FrontierCode v1.1 (Main)",
+      "area": "Agentic coding",
+      "scores": [
+        {
+          "model": "claude-sonnet-5-5",
+          "value": 46.2,
+          "display": "46.2%",
+          "source": "sonnet-5-5",
+          "note": "Max effort"
+        },
+        { "model": "claude-opus-5-5", "value": 54.4, "display": "54.4%", "source": "sonnet-5-5" }
+      ]
+    },
+    {
+      "id": "cursorbench-4.0",
+      "name": "CursorBench 4.0",
+      "area": "Agentic coding",
+      "scores": [
+        {
+          "model": "claude-sonnet-5-5",
+          "value": 55.5,
+          "display": "55.5%",
+          "source": "sonnet-5-5"
+        },
+        { "model": "claude-opus-5-5", "value": 57.8, "display": "57.8%", "source": "sonnet-5-5" }
+      ]
+    },
+    {
+      "id": "gdpval-aa-2.1",
+      "name": "GDPval-AA v2.1",
+      "area": "Knowledge work",
+      "scores": [
+        { "model": "claude-sonnet-5-5", "value": 1844, "display": "1844", "source": "sonnet-5-5" },
+        { "model": "claude-opus-5-5", "value": 1846, "display": "1846", "source": "sonnet-5-5" }
+      ]
+    },
+    {
+      "id": "aa-briefcase-1.1",
+      "name": "AA-Briefcase v1.1",
+      "area": "Knowledge work",
+      "scores": [
+        { "model": "claude-sonnet-5-5", "value": 1811, "display": "1811", "source": "sonnet-5-5" },
+        { "model": "claude-opus-5-5", "value": 1822, "display": "1822", "source": "sonnet-5-5" }
+      ]
+    },
+    {
+      "id": "hle-with-tools",
+      "name": "Humanity's Last Exam (with tools)",
+      "area": "Multidisciplinary reasoning",
+      "scores": [
+        {
+          "model": "claude-sonnet-5-5",
+          "value": 64.5,
+          "display": "64.5%",
+          "source": "sonnet-5-5"
+        },
+        { "model": "claude-opus-5-5", "value": 67.7, "display": "67.7%", "source": "sonnet-5-5" }
+      ]
+    },
+    {
+      "id": "osworld-2.1-partial",
+      "name": "OSWorld 2.1 (partial)",
+      "area": "Computer use",
+      "scores": [
+        {
+          "model": "claude-sonnet-5-5",
+          "value": 80.1,
+          "display": "80.1%",
+          "source": "sonnet-5-5"
+        },
+        { "model": "claude-opus-5-5", "value": 81.8, "display": "81.8%", "source": "sonnet-5-5" }
+      ]
+    },
+    {
+      "id": "chartography-no-tools",
+      "name": "Chartography (no tools)",
+      "area": "Visual chart recognition",
+      "scores": [
+        {
+          "model": "claude-sonnet-5-5",
+          "value": 61.6,
+          "display": "61.6%",
+          "source": "sonnet-5-5"
+        },
+        { "model": "claude-opus-5-5", "value": 64.4, "display": "64.4%", "source": "sonnet-5-5" }
+      ]
+    },
+    {
+      "id": "chartography-with-tools",
+      "name": "Chartography (with tools)",
+      "area": "Visual chart recognition",
+      "scores": [
+        { "model": "claude-opus-5-5", "value": 89.0, "display": "89.0%", "source": "opus-5-5" }
+      ]
+    },
+    {
+      "id": "automationbench",
+      "name": "AutomationBench",
+      "area": "Business workflows",
+      "scores": [
+        {
+          "model": "claude-opus-5-5",
+          "value": 40.0,
+          "display": "40.0%",
+          "source": "opus-5-5",
+          "note": "Run and reported by Zapier"
+        }
+      ]
+    },
+    {
+      "id": "terminal-bench-science-0.1",
+      "name": "Terminal-Bench-Science 0.1",
+      "area": "Agentic scientific research",
+      "scores": [
+        {
+          "model": "claude-opus-5-5",
+          "value": 58.7,
+          "display": "58.7%",
+          "source": "opus-5-5",
+          "note": "Standard error ±3.5–5 pts"
+        }
+      ]
+    },
+    {
+      "id": "swe-bench-verified",
+      "name": "SWE-bench Verified",
+      "area": "Agentic coding",
+      "scores": [
+        {
+          "model": "claude-haiku-4-5",
+          "value": 73.3,
+          "display": "73.3%",
+          "source": "haiku-4-5",
+          "note": "Averaged over 50 trials, 128K thinking budget"
+        }
+      ]
+    }
+  ]
+}

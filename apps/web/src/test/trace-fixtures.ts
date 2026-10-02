@@ -20,6 +20,7 @@ interface RunOptions {
   passed: boolean;
   stopReason?: StopReason;
   withError?: boolean;
+  thinking?: string | null;
 }
 
 export function recordedRun(options: RunOptions): FixtureRun {
@@ -28,7 +29,7 @@ export function recordedRun(options: RunOptions): FixtureRun {
     family_id: options.configName,
     version: 1,
     display_name: options.displayName,
-    backend: "litellm",
+    backend: "agent_sdk",
     model: options.model,
     provider: options.provider,
     model_family: options.modelFamily,
@@ -41,8 +42,9 @@ export function recordedRun(options: RunOptions): FixtureRun {
   const envelope = () => ({
     run_id: options.runId,
     side: null,
+    // One second apart, like a real run: the gaps are what the blind view must hide.
+    timestamp: `2026-10-02T12:00:${String(seq).padStart(2, "0")}+00:00`,
     seq: seq++,
-    timestamp: "2026-10-02T12:00:00+00:00",
     redacted: false,
   });
 
@@ -62,6 +64,7 @@ export function recordedRun(options: RunOptions): FixtureRun {
         ],
         output: {
           content: "I will compute it.",
+          thinking: options.thinking ?? null,
           tool_calls: [{ call_id: "c1", tool: "calculator", arguments: { expression: "37*4.85" } }],
           truncated: false,
         },
@@ -141,22 +144,23 @@ export function recordedRun(options: RunOptions): FixtureRun {
 
 export const leftRun = recordedRun({
   runId: "01JRUNLEFT0000000000000000",
-  configName: "gemini-full",
-  displayName: "Gemini 3.8 Flash, full prompt",
-  model: "gemini/gemini-3.8-flash",
-  provider: "gemini",
-  modelFamily: "gemini",
+  configName: "claude-opus-full",
+  displayName: "Claude Opus 5.5, full prompt",
+  model: "claude-opus-5-5",
+  provider: "anthropic",
+  modelFamily: "claude",
   systemPrompt: "You are an agent that solves one task using the tools you are given.",
   passed: true,
+  thinking: "Multiply the unit price by the quantity.",
 });
 
 export const rightRun = recordedRun({
   runId: "01JRUNRIGHT000000000000000",
-  configName: "qwen-two-tools",
-  displayName: "Qwen 3.8 27B, two tools",
-  model: "groq/qwen/qwen3.8-27b",
-  provider: "groq",
-  modelFamily: "qwen",
+  configName: "claude-haiku-full",
+  displayName: "Claude Haiku 4.5, full prompt",
+  model: "claude-haiku-4-5",
+  provider: "anthropic",
+  modelFamily: "claude",
   systemPrompt: "Answer the question.",
   passed: false,
   stopReason: "max_cost",
@@ -171,7 +175,6 @@ export function identifyingStrings(run: FixtureRun): string[] {
     run.config.family_id,
     run.config.display_name,
     run.config.model,
-    run.config.model_family,
     run.config.system_prompt,
   ];
 }

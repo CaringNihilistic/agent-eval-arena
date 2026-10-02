@@ -2,20 +2,29 @@
 //
 // This is the only implementation of redaction in the project. It must run on
 // the server; the browser never receives the fields removed here. Any new field
-// that reveals the result, the cost, or which config a side is must be handled
-// below and added to the leak scan in blind-view.test.ts.
+// that reveals the result, the cost, the speed, or which config a side is must
+// be handled below and added to the leak scan in src/test/leak-scan.ts.
 
 import type { TraceEvent } from "@arena/schema";
 
 export type MatchSide = "left" | "right";
 
-/** Stop reasons that reveal how much of its budget a run spent. */
-const BUDGET_STOP_REASONS = new Set(["max_tokens", "max_cost"]);
+/**
+ * Stop reasons that reveal how much of its budget, or how long, a run took.
+ * A voter still sees that the run ended without an answer.
+ */
+const HIDDEN_STOP_REASONS = new Set(["max_tokens", "max_cost", "timeout"]);
 
 /** Shown instead of an error's own text, which can name the model or provider. */
 export const REDACTED_ERROR_MESSAGE = "The run hit an error.";
 
-/** What replaces a run id, so the unblinded run permalink cannot be found. */
+/**
+ * Every event carries this instead of its real time. The gaps between real
+ * timestamps are the model's speed, and speed identifies the model.
+ */
+export const BLIND_TIMESTAMP = "1970-01-01T00:00:00+00:00";
+
+/** What replaces a run id, so the unblinded run cannot be looked up. */
 export function sideAlias(matchId: string, side: MatchSide): string {
   return `${matchId}:${side}`;
 }
@@ -29,7 +38,12 @@ export function redactEvent(
   matchId: string,
   side: MatchSide,
 ): TraceEvent | null {
-  const envelope = { run_id: sideAlias(matchId, side), side, redacted: true };
+  const envelope = {
+    run_id: sideAlias(matchId, side),
+    side,
+    redacted: true,
+    timestamp: BLIND_TIMESTAMP,
+  };
 
   switch (event.type) {
     case "run_started":
@@ -48,10 +62,16 @@ export function redactEvent(
           cache_write_tokens: null,
           cost_usd: null,
           reference_cost_usd: null,
+          latency_ms: null,
+          // Only some models think, so a thinking block gives the model away.
+          output: { ...event.payload.output, thinking: null },
           // The system prompt identifies the config.
           input_preview: event.payload.input_preview.filter((message) => message.role !== "system"),
         },
       };
+
+    case "tool_result":
+      return { ...event, ...envelope, payload: { ...event.payload, latency_ms: null } };
 
     case "step_finished":
       return {
@@ -70,8 +90,9 @@ export function redactEvent(
           cost_usd: null,
           reference_cost_usd: null,
           total_tokens: null,
+          latency_ms: null,
           stop_reason:
-            stopReason !== null && BUDGET_STOP_REASONS.has(stopReason) ? null : stopReason,
+            stopReason !== null && HIDDEN_STOP_REASONS.has(stopReason) ? null : stopReason,
         },
       };
     }
@@ -84,12 +105,11 @@ export function redactEvent(
       };
 
     case "score_computed":
-      // Pass or fail is exactly what the voter must not know yet.
+      // Pass or fail, and the constraint checks, are what the voter must not know yet.
       return null;
 
     case "step_started":
     case "tool_call":
-    case "tool_result":
       return { ...event, ...envelope };
 
     default: {
@@ -114,11 +134,10 @@ export function blindView(
 export interface BlindSideSummary {
   finished: boolean;
   steps: number;
-  elapsed_ms: number | null;
   final_answer: string | null;
 }
 
-/** The only figures shown beside a trace before the vote: steps, elapsed time, the answer. */
+/** The only figures shown beside a trace before the vote: the step count and the answer. */
 export function summarizeBlindSide(events: readonly TraceEvent[]): BlindSideSummary {
   let steps = 0;
   for (const event of events) {
@@ -129,28 +148,26 @@ export function summarizeBlindSide(events: readonly TraceEvent[]): BlindSideSumm
       return {
         finished: true,
         steps: event.payload.steps,
-        elapsed_ms: event.payload.latency_ms,
         final_answer: event.payload.final_answer,
       };
     }
   }
-  return { finished: false, steps, elapsed_ms: null, final_answer: null };
+  return { finished: false, steps, final_answer: null };
 }
 
-export interface BlindMatchView {
-  match_id: string;
-  voted: false;
-  sides: Record<MatchSide, { summary: BlindSideSummary; events: TraceEvent[] }>;
+export interface BlindSide {
+  summary: BlindSideSummary;
+  events: TraceEvent[];
 }
 
-/** Everything about a match's runs that is sent to a voter who has not voted. */
-export function blindMatchView(
+/** Both runs of a match as a voter who has not voted may see them. */
+export function blindSides(
   matchId: string,
   runs: Record<MatchSide, readonly TraceEvent[]>,
-): BlindMatchView {
-  const side = (name: MatchSide) => {
+): Record<MatchSide, BlindSide> {
+  const side = (name: MatchSide): BlindSide => {
     const events = blindView(runs[name], matchId, name);
     return { summary: summarizeBlindSide(events), events };
   };
-  return { match_id: matchId, voted: false, sides: { left: side("left"), right: side("right") } };
+  return { left: side("left"), right: side("right") };
 }

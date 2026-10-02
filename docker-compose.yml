@@ -75,6 +75,24 @@ services:
       timeout: 3s
       retries: 12
 
+  # Votes and rate-limit counters for the web app. Local stand-in for Neon.
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: arena
+      # A local development database on a loopback port, not a secret.
+      POSTGRES_PASSWORD: arena-local
+      POSTGRES_DB: arena
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arena -d arena"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   # Production-build check for the frontend. Not started by a plain
   # `docker compose up`: daily development runs the web app on the host
   # (`pnpm dev:local`). Start it with `pnpm web:prodcheck`.
@@ -84,7 +102,7 @@ services:
     working_dir: /repo
     command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter web build && pnpm --filter web exec next start --hostname 0.0.0.0 --port 3100"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
+      DATABASE_URL: postgres://arena:arena-local@db:5432/arena
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -101,7 +119,7 @@ services:
       - web_next:/repo/apps/web/.next
       - web_pnpm_store:/repo/.pnpm-store
     depends_on:
-      api:
+      db:
         condition: service_healthy
 
 networks:
@@ -109,6 +127,7 @@ networks:
     internal: true
 
 volumes:
+  db_data:
   web_root_modules:
   web_app_modules:
   web_schema_modules:

@@ -173,6 +173,7 @@ class RunContext:
         ]
         self._previewed_upto = input_upto
         content, truncated = truncate(response.content or "", self.limits.preview_chars)
+        thinking, _ = truncate(response.thinking or "", self.limits.preview_chars)
         self.emitter.emit(
             "llm_call",
             {
@@ -182,6 +183,7 @@ class RunContext:
                 "input_preview": [self._preview(m) for m in new_inputs],
                 "output": {
                     "content": content if response.content is not None else None,
+                    "thinking": thinking if response.thinking is not None else None,
                     "tool_calls": [
                         {
                             "call_id": self.trace_call_id(call.call_id),

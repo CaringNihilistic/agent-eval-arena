@@ -16,7 +16,7 @@ from arena.settings import Settings, get_settings
 runner = CliRunner()
 
 
-def test_committed_configs_form_the_controlled_pairs() -> None:
+def test_committed_configs_differ_only_in_the_model() -> None:
     configs = load_configs(get_settings().configs_dir)
 
     def differing_fields(a: str, b: str) -> set[str]:
@@ -24,21 +24,32 @@ def test_committed_configs_form_the_controlled_pairs() -> None:
         ignore = {"id", "family_id", "display_name"}
         return {key for key in left if key not in ignore and left[key] != right[key]}
 
-    assert differing_fields("gemini-full", "gemini-bare-prompt") == {"system_prompt"}
-    assert differing_fields("qwen-full", "qwen-two-tools") == {"enabled_tools"}
-    assert differing_fields("gemini-full", "qwen-full") == {"model", "provider", "model_family"}
-    assert configs["gemini-bare-prompt"].system_prompt == "Answer the question."
-    assert differing_fields("claude-sonnet-full", "claude-sonnet-bare-prompt") == {"system_prompt"}
+    assert sorted(configs) == ["claude-haiku-full", "claude-opus-full", "claude-sonnet-full"]
     assert differing_fields("claude-opus-full", "claude-sonnet-full") == {"model"}
     assert differing_fields("claude-sonnet-full", "claude-haiku-full") == {"model"}
-    # The Claude and free-tier configs share the same two prompt texts and tool set.
-    assert configs["claude-sonnet-full"].system_prompt == configs["gemini-full"].system_prompt
-    assert configs["claude-sonnet-bare-prompt"].system_prompt == "Answer the question."
-    assert configs["claude-opus-full"].enabled_tools == configs["gemini-full"].enabled_tools
-    assert {c.backend for n, c in configs.items() if n.startswith("claude-")} == {"agent_sdk"}
-    assert len(configs) == 8
+    assert {config.backend for config in configs.values()} == {"agent_sdk"}
     assert {config.max_steps for config in configs.values()} == {10}
     assert {config.temperature for config in configs.values()} == {None}
+
+
+LITELLM_CONFIG = (
+    "name: {name}\nversion: 1\ndisplay_name: Test\nbackend: litellm\n"
+    "model: {model}\nprovider: {provider}\nmodel_family: test\n"
+    "system_prompt: x\nenabled_tools: [calculator]\nmax_steps: 3\ntemperature: null\n"
+)
+
+
+def use_litellm_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, model: str, provider: str
+) -> None:
+    """No committed config uses the LiteLLM backend, so its CLI paths get a temporary one."""
+    (tmp_path / f"{name}.yaml").write_text(
+        LITELLM_CONFIG.format(name=name, model=model, provider=provider), encoding="utf-8"
+    )
+    real = get_settings()
+    monkeypatch.setattr(
+        cli, "get_settings", lambda: Settings(configs_dir=tmp_path, tasks_dir=real.tasks_dir)
+    )
 
 
 def test_config_snapshot_matches_the_trace_schema() -> None:
@@ -145,14 +156,16 @@ def test_cli_lists_configs_and_tasks() -> None:
     result = runner.invoke(cli.app, ["list"])
 
     assert result.exit_code == 0
-    assert "gemini-full" in result.output
-    assert "qwen-two-tools" in result.output
+    assert "claude-haiku-full" in result.output
+    assert "claude-opus-full" in result.output
     assert "dev-math-01" in result.output
 
 
 def test_cli_reports_an_unknown_config_or_task() -> None:
     unknown_config = runner.invoke(cli.app, ["run", "--config", "nope", "--task", "dev-math-01"])
-    unknown_task = runner.invoke(cli.app, ["run", "--config", "gemini-full", "--task", "nope"])
+    unknown_task = runner.invoke(
+        cli.app, ["run", "--config", "claude-haiku-full", "--task", "nope"]
+    )
 
     assert unknown_config.exit_code == 2
     assert "No config named 'nope'" in unknown_config.output
@@ -163,16 +176,7 @@ def test_cli_reports_an_unknown_config_or_task() -> None:
 def test_cli_refuses_a_paid_model_without_calling_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (tmp_path / "paid.yaml").write_text(
-        "name: paid\nversion: 1\ndisplay_name: Paid\nbackend: litellm\n"
-        "model: anthropic/claude-opus-5-5\nprovider: anthropic\nmodel_family: claude\n"
-        "system_prompt: x\nenabled_tools: [calculator]\nmax_steps: 3\ntemperature: null\n",
-        encoding="utf-8",
-    )
-    real = get_settings()
-    monkeypatch.setattr(
-        cli, "get_settings", lambda: Settings(configs_dir=tmp_path, tasks_dir=real.tasks_dir)
-    )
+    use_litellm_config(tmp_path, monkeypatch, "paid", "anthropic/claude-opus-5-5", "anthropic")
 
     def never(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("a model client must not be built for a refused run")
@@ -196,7 +200,10 @@ def test_cli_refuses_a_claude_config_without_a_subscription_login() -> None:
     assert "CLAUDE_CODE_OAUTH_TOKEN is not set" in result.output
 
 
-def test_cli_stops_early_when_the_provider_key_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_stops_early_when_the_provider_key_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_litellm_config(tmp_path, monkeypatch, "free", "gemini/gemini-3.8-flash", "gemini")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     def never(*_args: object, **_kwargs: object) -> None:
@@ -204,7 +211,7 @@ def test_cli_stops_early_when_the_provider_key_is_missing(monkeypatch: pytest.Mo
 
     monkeypatch.setattr("arena.llm.LiteLLMClient.complete", never)
 
-    result = runner.invoke(cli.app, ["run", "--config", "gemini-full", "--task", "dev-math-01"])
+    result = runner.invoke(cli.app, ["run", "--config", "free", "--task", "dev-math-01"])
 
     assert result.exit_code == 2
     assert "GEMINI_API_KEY is not set" in result.output

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -11,10 +12,11 @@ import typer
 from arena.backends.base import BackendUnavailableError
 from arena.backends.claude_auth import SubscriptionAuthError
 from arena.config import AgentConfig, Task, load_bank, load_config, load_configs, load_tasks
-from arena.evaluation import HEADER, evaluate, format_row, summarise
+from arena.evaluation import HEADER, EvalRow, evaluate, format_row, summarise
 from arena.events import Event
 from arena.llm import LiteLLMClient
 from arena.pricing import ModelNotAllowedError
+from arena.recording import build_index, record
 from arena.runner import RunResult, run_agent
 from arena.settings import get_settings
 
@@ -76,7 +78,7 @@ def describe(event: Event) -> str:
 
 @app.command()
 def run(
-    config: Annotated[str, typer.Option(help="Config name, for example gemini-full")],
+    config: Annotated[str, typer.Option(help="Config name, for example claude-haiku-full")],
     task: Annotated[str, typer.Option(help="Task id, for example dev-math-01")],
     allow_paid: Annotated[
         bool, typer.Option("--allow-paid", help="Allow a model billed per token. Costs money.")
@@ -162,7 +164,7 @@ def _check_provider_key(agent_config: AgentConfig) -> None:
 
 @app.command(name="eval")
 def eval_config(
-    config: Annotated[str, typer.Option(help="Config name, for example qwen-full")],
+    config: Annotated[str, typer.Option(help="Config name, for example claude-haiku-full")],
     category: Annotated[
         str | None,
         typer.Option(
@@ -213,6 +215,83 @@ def eval_config(
         raise typer.Exit(3) from error
     for line in summarise(rows):
         typer.echo(line)
+
+
+@app.command(name="record")
+def record_bank(
+    config: Annotated[
+        list[str] | None, typer.Option(help="Only these configs (repeatable). Default: all")
+    ] = None,
+    task: Annotated[list[str] | None, typer.Option(help="Only these task ids (repeatable)")] = None,
+    dump_raw: Annotated[
+        Path | None,
+        typer.Option(help="Write the raw request and response bodies of the first run here"),
+    ] = None,
+    index_only: Annotated[
+        bool, typer.Option("--index-only", help="Rebuild the index files and run nothing")
+    ] = False,
+) -> None:
+    """Record every missing (config, task) run into data/recordings/, then rebuild the index.
+
+    Every run is a real model call on the subscription. Runs already recorded are
+    skipped, so the command can be stopped and started again.
+    """
+    settings = get_settings()
+    out_dir = settings.recordings_dir
+    bank = load_bank(settings.tasks_dir)
+    if index_only:
+        runs, matches = build_index(out_dir, list(bank.values()))
+        typer.echo(f"index rebuilt: {runs} runs, {matches} matches")
+        return
+    configs = load_configs(settings.configs_dir)
+    unknown = [name for name in config or [] if name not in configs]
+    if unknown:
+        typer.echo(f"No config named {unknown[0]!r}.", err=True)
+        raise typer.Exit(2)
+    chosen_configs = [configs[name] for name in (config or configs)]
+    chosen_tasks = [item for item in bank.values() if not task or item.id in task]
+    if not chosen_tasks:
+        typer.echo("No task matches that selection.", err=True)
+        raise typer.Exit(2)
+    raw_dirs = [dump_raw] if dump_raw is not None else []
+
+    async def run_one(agent_config: AgentConfig, item: Task) -> RunResult:
+        llm = LiteLLMClient() if agent_config.backend == "litellm" else None
+        # Only the first run of this invocation is captured.
+        raw = raw_dirs.pop() if raw_dirs else None
+        return await run_agent(agent_config, item, llm=llm, settings=settings, raw_request_dir=raw)
+
+    def show(agent_config: AgentConfig, item: Task, result: RunResult) -> None:
+        typer.echo(f"{agent_config.name:<20} {format_row(EvalRow(item, result))}")
+
+    typer.echo(f"{'config':<20} {HEADER}")
+    try:
+        report = asyncio.run(record(chosen_configs, chosen_tasks, run_one, out_dir, on_run=show))
+    except (ModelNotAllowedError, BackendUnavailableError, SubscriptionAuthError) as error:
+        typer.echo(f"Refused: {error}", err=True)
+        raise typer.Exit(3) from error
+    runs, matches = build_index(out_dir, list(bank.values()))
+    typer.echo(
+        f"recorded {len(report.recorded)}, already had {report.skipped}, "
+        f"still missing {report.remaining}; index: {runs} runs, {matches} matches"
+    )
+    if report.cause == "usage_limit":
+        resets = (
+            datetime.fromtimestamp(report.resets_at, UTC).isoformat(timespec="minutes")
+            if report.resets_at
+            else "an unknown time"
+        )
+        typer.echo(
+            f"Stopped at the subscription's usage limit ({report.detail}). It resets at "
+            f"{resets}. Run the same command again after that.",
+            err=True,
+        )
+        raise typer.Exit(5)
+    if report.cause != "done":
+        typer.echo(
+            f"Stopped: {report.cause} ({report.detail}). Nothing was written for it.", err=True
+        )
+        raise typer.Exit(6)
 
 
 @app.command(name="list")

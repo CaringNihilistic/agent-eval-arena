@@ -38,6 +38,8 @@ class LLMResponse:
     latency_ms: int
     cache_read_tokens: int | None = None
     cache_write_tokens: int | None = None
+    # The model's thinking, when the provider returns it. Shown only after a vote.
+    thinking: str | None = None
 
 
 class LLMCallError(Exception):

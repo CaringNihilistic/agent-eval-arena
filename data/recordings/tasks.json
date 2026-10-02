@@ -1,0 +1,263 @@
+[
+  {
+    "id": "agent-01",
+    "title": "Mean without a faulty reading",
+    "category": "agent",
+    "difficulty": "hard",
+    "prompt": "In sensor_readings.csv in the fixtures folder (columns: timestamp, sensor, temperature_c, humidity_pct), sensor A has one faulty reading above 60 degrees, and some readings are blank. What is the mean temperature of sensor A, leaving out the blank readings and the faulty one?\nAnswer with the number only, to two decimal places.\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "agent-02",
+    "title": "Top three items by stock value",
+    "category": "agent",
+    "difficulty": "hard",
+    "prompt": "Using inventory.csv in the fixtures folder (columns: sku, name, category, stock, reorder_point, unit_cost), the stock value of an item is stock times unit_cost. Which three items have the highest stock value?\nAnswer with the three SKUs only, highest first, separated by commas. For example: SKU-001, SKU-002, SKU-003\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "agent-03",
+    "title": "Regatta sponsor's founding gap",
+    "category": "agent",
+    "difficulty": "hard",
+    "prompt": "How many years after the Bay Regatta was first held was the organisation that now sponsors it founded?\nAnswer with the number only.\n",
+    "required_tools": [
+      "search_docs",
+      "calculator"
+    ]
+  },
+  {
+    "id": "agent-04",
+    "title": "Counting lines in a large log",
+    "category": "agent",
+    "difficulty": "hard",
+    "prompt": "The file server.log in the fixtures folder has one entry per line, in the form: timestamp, level, service, message. How many lines have the level ERROR?\nAnswer with the number only.\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "agent-05",
+    "title": "The notice replaces the guide",
+    "category": "agent",
+    "difficulty": "hard",
+    "prompt": "The fixtures folder contains notice.txt, the current service notice for the Harbor Ferry. According to that notice, how many minutes apart do ferries leave Pinecrest?\nAnswer with the number only.\n",
+    "required_tools": [
+      "read_file"
+    ]
+  },
+  {
+    "id": "code-01",
+    "title": "Fix the median function",
+    "category": "code",
+    "difficulty": "easy",
+    "prompt": "This function should return the median of a list of numbers, but it is wrong for lists with an even number of items, where the median is the mean of the two middle values. It should also raise ValueError for an empty list.\n\ndef median(values):\n    ordered = sorted(values)\n    middle = len(ordered) // 2\n    return ordered[middle]\n\nAnswer with the corrected Python function only.\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "code-02",
+    "title": "Parse a duration string",
+    "category": "code",
+    "difficulty": "medium",
+    "prompt": "Write a Python function parse_duration(text) that turns a duration such as '1h30m' into a number of seconds. The text is one or more parts, each a whole number followed by h, m, or s, in any order, for example '2h', '45s', '1h1m1s', '90m'. Raise ValueError if the text is empty or contains anything else.\nAnswer with the Python function only.\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "code-03",
+    "title": "Fix the chunk function",
+    "category": "code",
+    "difficulty": "medium",
+    "prompt": "This function should split a list into consecutive chunks of the given size, with a shorter last chunk if needed. It sometimes loses the last item. It should also raise ValueError if size is less than 1.\n\ndef chunk(items, size):\n    return [items[i:i + size] for i in range(0, len(items) - 1, size)]\n\nAnswer with the corrected Python function only.\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "code-04",
+    "title": "Merge overlapping intervals",
+    "category": "code",
+    "difficulty": "hard",
+    "prompt": "Write a Python function merge_intervals(intervals). Each interval is a list of two numbers [start, end] with start <= end. Return a list of intervals, sorted by start, in which every group of overlapping or touching intervals has been merged into one. [1, 4] and [4, 5] touch and become [1, 5]. The input may be in any order and may be empty.\nAnswer with the Python function only.\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "code-05",
+    "title": "Most frequent words",
+    "category": "code",
+    "difficulty": "medium",
+    "prompt": "Write a Python function top_words(text, k). Split the text on whitespace, treat words case-insensitively, and return a list of the k most frequent words in lower case, most frequent first. Words with the same count are ordered alphabetically. If there are fewer than k different words, return them all.\nAnswer with the Python function only.\n",
+    "required_tools": [
+      "python_exec"
+    ]
+  },
+  {
+    "id": "diagram-01",
+    "title": "Flowchart of order fulfilment",
+    "category": "diagram",
+    "difficulty": "medium",
+    "prompt": "Draw a Mermaid flowchart of this process. A customer places an order. If the item is in stock, it is packed and shipped. If it is not in stock, the customer is offered a backorder. If they accept, the order waits for a restock and is then packed and shipped. If they decline, the order is refunded.\nLimits: at most 20 lines. Answer with the Mermaid code only, with no explanation.\n",
+    "required_tools": []
+  },
+  {
+    "id": "diagram-02",
+    "title": "System architecture",
+    "category": "diagram",
+    "difficulty": "medium",
+    "prompt": "Draw a Mermaid flowchart of this system. A Web App sends every request to an API Gateway. The gateway calls the Auth Service to check the user, and the Orders Service for order data. The Orders Service reads and writes a PostgreSQL database and uses a Redis cache.\nLimits: at most 18 lines. Name all six components. Answer with the Mermaid code only, with no explanation.\n",
+    "required_tools": []
+  },
+  {
+    "id": "diagram-03",
+    "title": "Sequence diagram of a one-time-code login",
+    "category": "diagram",
+    "difficulty": "medium",
+    "prompt": "Draw a Mermaid sequence diagram of this login. The User enters a phone number in the App. The App asks the Auth Service to send a code. The Auth Service sends the code through the SMS Gateway, which delivers it to the User. The User types the code into the App, the App sends it to the Auth Service, and the Auth Service returns a session token.\nLimits: at most 18 lines. Use these four participants: User, App, Auth Service, SMS Gateway. Answer with the Mermaid code only, with no explanation.\n",
+    "required_tools": []
+  },
+  {
+    "id": "diagram-04",
+    "title": "State diagram of a support ticket",
+    "category": "diagram",
+    "difficulty": "hard",
+    "prompt": "Draw a Mermaid state diagram of a support ticket. A ticket starts as Open. An agent picks it up and it becomes In Progress. From In Progress it can go to Waiting on Customer and back to In Progress when the customer replies, or to Resolved. A Resolved ticket becomes Closed after seven days, or goes back to Open if the customer reopens it.\nLimits: at most 18 lines. Use stateDiagram-v2. Answer with the Mermaid code only, with no explanation.\n",
+    "required_tools": []
+  },
+  {
+    "id": "diagram-05",
+    "title": "Flowchart of a release pipeline",
+    "category": "diagram",
+    "difficulty": "medium",
+    "prompt": "Draw a Mermaid flowchart of this release pipeline. A commit triggers lint, then tests, then a build. If any of those three fails, the team is notified and the pipeline stops. After a successful build the release is deployed to staging. A person must give manual approval; if approved it is deployed to production, and if rejected the pipeline stops.\nLimits: at most 22 lines. Answer with the Mermaid code only, with no explanation.\n",
+    "required_tools": []
+  },
+  {
+    "id": "explain-01",
+    "title": "Recursion for a new programmer",
+    "category": "explanation",
+    "difficulty": "medium",
+    "prompt": "Explain recursion to someone who has just started programming.\nLimits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Mention the base case.\nAnswer with the explanation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "explain-02",
+    "title": "Hash tables for a beginner",
+    "category": "explanation",
+    "difficulty": "medium",
+    "prompt": "Explain how a hash table works to a beginner who knows what a list is.\nLimits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Use the words 'key' and 'collision'.\nAnswer with the explanation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "explain-03",
+    "title": "DNS for a non-technical reader",
+    "category": "explanation",
+    "difficulty": "easy",
+    "prompt": "Explain what DNS does when you open a website to someone with no technical background.\nLimits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Mention the IP address.\nAnswer with the explanation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "explain-04",
+    "title": "Big-O notation for a student",
+    "category": "explanation",
+    "difficulty": "hard",
+    "prompt": "Explain Big-O notation to a first-year student who can write a loop.\nLimits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Use the notations O(n) and O(1).\nAnswer with the explanation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "explain-05",
+    "title": "Public-key encryption for a curious reader",
+    "category": "explanation",
+    "difficulty": "hard",
+    "prompt": "Explain public-key encryption to a curious reader who has never studied cryptography.\nLimits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Use the words 'public key' and 'private key'.\nAnswer with the explanation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "stack-01",
+    "title": "Booking site for a dance studio",
+    "category": "tech_stack",
+    "difficulty": "easy",
+    "prompt": "Recommend a technology stack for this project.\n\nA dance studio wants a website where about 300 students can book and pay for classes. Two developers will build it in 6 weeks. Hosting must cost no more than $50 a month.\n\nLimits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.\nAnswer with the recommendation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "stack-02",
+    "title": "Sensor dashboard",
+    "category": "tech_stack",
+    "difficulty": "hard",
+    "prompt": "Recommend a technology stack for this project.\n\nA factory wants a live dashboard for 10,000 sensors that each send a reading every 10 seconds. Five engineers have 4 months. The cloud bill must stay under $2,000 a month.\n\nLimits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.\nAnswer with the recommendation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "stack-03",
+    "title": "Internal leave tracker",
+    "category": "tech_stack",
+    "difficulty": "easy",
+    "prompt": "Recommend a technology stack for this project.\n\nA 20-person company wants an internal tool to request and approve leave. One developer has 2 weeks. There is no budget, so everything must run on free tiers.\n\nLimits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.\nAnswer with the recommendation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "stack-04",
+    "title": "Mobile app for a food co-op",
+    "category": "tech_stack",
+    "difficulty": "medium",
+    "prompt": "Recommend a technology stack for this project.\n\nA food co-operative with 5,000 members wants an iOS and Android app for ordering weekly boxes. Three developers, all with JavaScript experience, have 3 months. The running cost must stay under $300 a month.\n\nLimits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.\nAnswer with the recommendation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "stack-05",
+    "title": "Shop platform migration",
+    "category": "tech_stack",
+    "difficulty": "hard",
+    "prompt": "Recommend a technology stack for this project.\n\nAn online shop with 2 million monthly visitors, and ten times that traffic on sale days, wants to replace its old platform. Eight engineers have 9 months. The infrastructure budget is $15,000 a month.\n\nLimits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.\nAnswer with the recommendation only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "writing-01",
+    "title": "Cold email to a clinic",
+    "category": "writing",
+    "difficulty": "medium",
+    "prompt": "Write a cold email from Priya Nair, who sells a booking app called Slotwise, to the owner of a small physiotherapy clinic. The clinic takes bookings by phone and loses appointments to no-shows.\nLimits: at most 110 words in total. The first line must start with 'Subject:'. Name the product. Mention no-shows. End by proposing a 15-minute call. Do not use the phrase 'I hope this email finds you well'.\nAnswer with the email only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "writing-02",
+    "title": "Rewrite a messy paragraph",
+    "category": "writing",
+    "difficulty": "easy",
+    "prompt": "Rewrite this paragraph so it is clear and short:\n\n\"So basically what happened is that the meeting, which was originally going to be on Monday, has now been moved, due to the fact that several people could not make it, to Thursday at 14:00, and also it will not be in the usual room but instead in Room 204, and everyone should, if at all possible, bring their laptop because we will be doing the budget review together.\"\n\nLimits: at most 45 words and at most three sentences. Keep the day, the time, the room, and the request to bring a laptop.\nAnswer with the rewritten paragraph only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "writing-03",
+    "title": "Product description for a backpack",
+    "category": "writing",
+    "difficulty": "easy",
+    "prompt": "Write a product description for the Tern 2 commuter backpack. Facts: 22-litre capacity; weighs 780 grams; padded sleeve for a 16-inch laptop; made from recycled sailcloth; rain cover included.\nLimits: at most 60 words. Mention the capacity, the laptop sleeve, and the recycled material. Do not mention a price.\nAnswer with the description only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "writing-04",
+    "title": "Story opening under constraints",
+    "category": "writing",
+    "difficulty": "hard",
+    "prompt": "Write the opening of a short story.\nLimits: exactly three sentences and at most 60 words. Tell it in the first person. Set it in a lighthouse. Include the word 'tide'. Do not use the word 'suddenly'.\nAnswer with the story opening only.\n",
+    "required_tools": []
+  },
+  {
+    "id": "writing-05",
+    "title": "Declining an invitation",
+    "category": "writing",
+    "difficulty": "medium",
+    "prompt": "Write a reply from Jonas Weber declining an invitation to speak at a conference on 12 March, because he will be travelling.\nLimits: at most 90 words. The first line must be 'Dear Ms Albrecht,'. Thank her, say clearly that he cannot attend, mention the date, and offer an alternative: a later event or a colleague who could speak.\nAnswer with the reply only.\n",
+    "required_tools": []
+  }
+]

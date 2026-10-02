@@ -116,3 +116,25 @@ Requests refused with HTTP 503 appear to count against the daily quota: `gemini-
 - **Fixed cost per model call is about 1,400 input tokens**, and it dominates: 74% to 83% of each run's tokens. Most of that is not Claude Code's doing. By the size of each part in the captured requests, about 55% is the tool definitions and 17% the arena's system prompt, which every config on either backend sends; about 20% (the billing line, the identity line, and the environment and date reminders, roughly 170 to 200 tokens a call) is added by Claude Code. So the harness accounts for roughly a tenth of a Claude run's tokens. This is an estimate from character counts, not a token count.
 - **Haiku ran code to check its word count before submitting** the story opening. Tools are not inert on writing tasks.
 - **Four runs say nothing about quality or separation.** All four results were clean; whether the bank separates configs is a question for the full recording and the votes.
+
+## 8. The full recording: 90 runs, three Claude models
+
+**Recorded 2026-10-02**, one run per model per task, on the subscription. Actual cost $0.
+
+| Model      | Code and agent tasks passed | Constraints met (open-ended) | Tokens, all 30 runs | Largest run | Mean active time | Cost at API rates |
+| ---------- | --------------------------- | ---------------------------- | ------------------- | ----------- | ---------------- | ----------------- |
+| Haiku 4.5  | 9 of 10                     | 85 of 101                    | 117,632             | 9,743       | 5.7 s            | $0.18             |
+| Sonnet 5.5 | 10 of 10                    | 98 of 101                    | 66,442              | 5,615       | 4.1 s            | $0.14             |
+| Opus 5.5   | 10 of 10                    | 96 of 101                    | 67,024              | 5,678       | 4.6 s            | $0.28             |
+
+- **The pass/fail tasks barely separate the models.** One failure in 30 scored runs: Haiku on `agent-01`. The scorer cannot rank Opus against Sonnet on these tasks; that is left to the votes.
+- **Where the constraint checks differ.** Diagrams: all three met every check. Tech stack: Haiku 25 of 35, the others 35 of 35. Writing: Haiku 25 of 29, the others 29 of 29. Explanation: Haiku 18 of 20, Sonnet 17, Opus 15.
+- **Haiku's missed constraints are mostly a habit, not the content.** It often replies in plain text with a preamble ("Perfect! All requirements are met. Here's the email:") instead of submitting the answer alone, which breaks checks such as "starts with 'Subject:'". The preamble is part of its final answer and voters see it.
+- **Haiku uses about 1.75 times the tokens of the other two.** It took 58 model calls over 30 tasks against 37 each for Opus and Sonnet: it calls tools to check its work, the others mostly answer in one call.
+- **Token cap.** No run reached the 16,000-token cap, and every run ended by answering.
+- **Thinking.** Haiku and Sonnet produced no thinking block. Opus produced one on 2 of its 37 model calls. The blind view hides them.
+- **Usage.** The 90 runs took about 10 minutes of run time and did not reach a subscription usage limit.
+
+**Harness overhead, from a request captured during this recording** (`claude-haiku-full` on `writing-01`, first model call). The API counted 1,468 input tokens. The request held 3,667 characters of text, of which Claude Code added 767 (21%): a billing line (191), an identity line (62), and three reminder blocks giving the environment, the model's name, and the date (514). The arena's own content was the tool definitions (1,897 characters), the system prompt (573), and the task (430). Character counts are measured; a token count per part is not available without the tokenizer, so in tokens the harness share is an estimate of roughly 200 per model call, about a tenth of a typical run. It is the same for all three models, so it does not affect the comparison between them.
+
+**One thing the harness adds that matters for blind voting.** One reminder block tells the model its own name ("You are powered by the model named Haiku 4.5"). A model could repeat that in an answer. None did in these 90 runs: the leak scan over every blind match checks for each model's name.

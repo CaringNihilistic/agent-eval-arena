@@ -170,15 +170,24 @@ class _Response:
         self.cache_write_tokens = int(usage.get("cache_creation_input_tokens") or 0)
         self.output_tokens = int(usage.get("output_tokens") or 0)
         self.text: list[str] = []
+        # None until a thinking block starts; the text may still be empty.
+        self.thinking: list[str] | None = None
         self.tool_uses: dict[int, dict[str, Any]] = {}
 
     def start_block(self, index: int, block: Mapping[str, Any]) -> None:
         if block.get("type") == "tool_use":
             self.tool_uses[index] = {"id": block["id"], "name": block["name"], "json": ""}
+        elif block.get("type") == "thinking":
+            self.thinking = self.thinking if self.thinking is not None else []
+            if block.get("thinking"):
+                self.thinking.append(str(block["thinking"]))
 
     def add_delta(self, index: int, delta: Mapping[str, Any]) -> None:
         if delta.get("type") == "text_delta":
             self.text.append(str(delta.get("text", "")))
+        elif delta.get("type") == "thinking_delta":
+            self.thinking = self.thinking if self.thinking is not None else []
+            self.thinking.append(str(delta.get("thinking", "")))
         elif delta.get("type") == "input_json_delta" and index in self.tool_uses:
             self.tool_uses[index]["json"] += str(delta.get("partial_json", ""))
 
@@ -216,6 +225,7 @@ class _Response:
             latency_ms=latency_ms,
             cache_read_tokens=self.cache_read_tokens,
             cache_write_tokens=self.cache_write_tokens,
+            thinking=None if self.thinking is None else "".join(self.thinking),
         )
 
 

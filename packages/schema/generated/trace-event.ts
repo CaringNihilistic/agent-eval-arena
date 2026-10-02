@@ -130,7 +130,10 @@ export interface LlmCallPayload {
    * What the same tokens would cost at the provider's paid list price. Null in the blind view.
    */
   reference_cost_usd: number | null;
-  latency_ms: number;
+  /**
+   * Null in the blind view: speed identifies the model.
+   */
+  latency_ms: number | null;
 }
 /**
  * A message shown in the trace, truncated for display. The full message is stored separately.
@@ -142,6 +145,10 @@ export interface MessagePreview {
 }
 export interface LlmOutput {
   content: string | null;
+  /**
+   * The model's thinking for this call, as the provider returned it. Null when the model did not think, and always null in the blind view.
+   */
+  thinking: string | null;
   tool_calls: ToolInvocation[];
   truncated: boolean;
 }
@@ -190,7 +197,10 @@ export interface ToolResultPayload {
   output: string;
   truncated: boolean;
   success: boolean;
-  latency_ms: number;
+  /**
+   * Null in the blind view.
+   */
+  latency_ms: number | null;
   error: string | null;
 }
 export interface StepFinishedEvent {
@@ -242,9 +252,9 @@ export interface RunFinishedPayload {
   total_tokens: number | null;
   steps: number;
   /**
-   * Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded.
+   * Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded. Null in the blind view.
    */
-  latency_ms: number;
+  latency_ms: number | null;
   /**
    * Null in the blind view when the run stopped at a token or cost limit.
    */

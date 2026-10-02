@@ -1,5 +1,21 @@
 # Agent Eval Arena
 
-Run two AI agent configurations on the same task, watch their traces side by side, and vote blind on which did better.
+Three Claude models were given the same 30 tasks with the same prompt and tools. You see two of them side by side on one task without knowing which is which, vote, and then see the models, this project's measured results, and Anthropic's published benchmarks.
 
-**Work in progress.** The project is being built in phases; the scaffold is in place and the agent runner, task bank, and arena UI are not built yet. See [docs/PLAN.md](docs/PLAN.md) for the design and the phase plan.
+**Work in progress.** All 90 runs are recorded and the replay site works locally. It is not deployed yet, and the measured results are not written up here yet.
+
+- Design: [docs/PLAN.md](docs/PLAN.md) (Section 0 is the current design)
+- Decisions and why: [docs/DECISIONS.md](docs/DECISIONS.md)
+- What the runs showed: [docs/FINDINGS.md](docs/FINDINGS.md)
+
+## Run it locally
+
+Needs Node 24, pnpm, and Docker.
+
+```
+pnpm install
+cp .env.example .env
+pnpm dev:local        # starts Postgres in Docker and the site on http://localhost:3100
+```
+
+The recorded runs are in `data/recordings/`, so no model is called and no key is needed.

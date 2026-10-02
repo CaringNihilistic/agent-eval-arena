@@ -38,7 +38,7 @@ def test_no_model_in_the_real_table_is_billed_per_token() -> None:
 def test_every_committed_config_is_runnable_without_any_override() -> None:
     configs = load_configs(get_settings().configs_dir)
 
-    assert len(configs) >= 4
+    assert len(configs) == 3
     for config in configs.values():
         entry = assert_runnable(default_pricing(), config.model, config.backend, allow_paid=False)
         assert entry.provider == config.provider

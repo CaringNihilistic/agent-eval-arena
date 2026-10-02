@@ -1,10 +1,14 @@
 // Finds anything in a payload that a voter must not see before voting.
 // Shared by every test that checks a blind response, so the rule is written once.
 
+import { BLIND_TIMESTAMP } from "@/lib/blind-view";
+
 /** Keys that must be absent or null in anything sent before the vote. */
 export const WITHHELD_KEYS = [
   "config",
+  "configs",
   "model",
+  "display_name",
   "prompt_tokens",
   "completion_tokens",
   "cache_read_tokens",
@@ -17,6 +21,14 @@ export const WITHHELD_KEYS = [
   "scorer_type",
   "explanation",
   "checks",
+  "checks_met",
+  "thinking",
+  "latency_ms",
+  "elapsed_ms",
+  "wall_clock_ms",
+  "answer_words",
+  "official",
+  "tallies",
 ] as const;
 
 export interface Leak {
@@ -25,9 +37,9 @@ export interface Leak {
 }
 
 /**
- * Walks `value` and reports every withheld key that holds a value, and every
- * place one of the `secrets` strings appears (model names, config names, run
- * ids, the system prompt).
+ * Walks `value` and reports every withheld key that holds a value, every real
+ * timestamp, and every place one of the `secrets` strings appears (model names,
+ * config names, run ids, the system prompt).
  */
 export function findLeaks(value: unknown, secrets: readonly string[], path = "$"): Leak[] {
   if (typeof value === "string") {
@@ -47,6 +59,9 @@ export function findLeaks(value: unknown, secrets: readonly string[], path = "$"
         withheld && child !== null && child !== undefined
           ? [{ path: childPath, reason: `"${key}" has a value` }]
           : [];
+      if (key === "timestamp" && child !== BLIND_TIMESTAMP) {
+        own.push({ path: childPath, reason: "a real timestamp" });
+      }
       return [...own, ...findLeaks(child, secrets, childPath)];
     });
   }

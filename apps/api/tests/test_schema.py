@@ -43,6 +43,7 @@ VALID_PAYLOADS: dict[str, dict[str, Any]] = {
         "input_preview": [{"role": "user", "content": "What is 2 + 2?", "truncated": False}],
         "output": {
             "content": None,
+            "thinking": None,
             "tool_calls": [
                 {"call_id": "c1", "tool": "calculator", "arguments": {"expression": "2+2"}}
             ],

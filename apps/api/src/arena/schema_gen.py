@@ -70,6 +70,12 @@ class LlmOutput(BaseModel):
         extra="forbid",
     )
     content: str | None
+    thinking: Annotated[
+        str | None,
+        Field(
+            description="The model's thinking for this call, as the provider returned it. Null when the model did not think, and always null in the blind view."
+        ),
+    ]
     tool_calls: list[ToolInvocation]
     truncated: bool
 
@@ -143,7 +149,9 @@ class LlmCallPayload(BaseModel):
             ge=0.0,
         ),
     ]
-    latency_ms: Annotated[int, Field(ge=0)]
+    latency_ms: Annotated[
+        int | None, Field(description="Null in the blind view: speed identifies the model.", ge=0)
+    ]
 
 
 class ToolCallPayload(BaseModel):
@@ -166,7 +174,7 @@ class ToolResultPayload(BaseModel):
     output: Annotated[str, Field(description="Truncated for display.")]
     truncated: bool
     success: bool
-    latency_ms: Annotated[int, Field(ge=0)]
+    latency_ms: Annotated[int | None, Field(description="Null in the blind view.", ge=0)]
     error: str | None
 
 
@@ -207,9 +215,9 @@ class RunFinishedPayload(BaseModel):
     total_tokens: Annotated[int | None, Field(description="Null in the blind view.", ge=0)]
     steps: Annotated[int, Field(ge=0)]
     latency_ms: Annotated[
-        int,
+        int | None,
         Field(
-            description="Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded.",
+            description="Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded. Null in the blind view.",
             ge=0,
         ),
     ]

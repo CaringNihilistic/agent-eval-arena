@@ -200,10 +200,14 @@
       "title": "LlmOutput",
       "type": "object",
       "additionalProperties": false,
-      "required": ["content", "tool_calls", "truncated"],
+      "required": ["content", "thinking", "tool_calls", "truncated"],
       "properties": {
         "content": {
           "type": ["string", "null"]
+        },
+        "thinking": {
+          "type": ["string", "null"],
+          "description": "The model's thinking for this call, as the provider returned it. Null when the model did not think, and always null in the blind view."
         },
         "tool_calls": {
           "type": "array",
@@ -323,8 +327,9 @@
           "minimum": 0
         },
         "latency_ms": {
-          "type": "integer",
-          "minimum": 0
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Null in the blind view: speed identifies the model."
         }
       }
     },
@@ -385,8 +390,9 @@
           "type": "boolean"
         },
         "latency_ms": {
-          "type": "integer",
-          "minimum": 0
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Null in the blind view."
         },
         "error": {
           "type": ["string", "null"]
@@ -457,9 +463,9 @@
           "minimum": 0
         },
         "latency_ms": {
-          "type": "integer",
+          "type": ["integer", "null"],
           "minimum": 0,
-          "description": "Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded."
+          "description": "Active time: the sum of model-call and tool-call latencies. Waits for rate limits are excluded. Null in the blind view."
         },
         "stop_reason": {
           "description": "Null in the blind view when the run stopped at a token or cost limit.",

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     tasks_dir: Path = REPO_ROOT / "tasks"
     fixtures_dir: Path = REPO_ROOT / "tasks" / "fixtures"
     corpus_dir: Path = REPO_ROOT / "tasks" / "corpus"
+    # Recorded runs and their index files. Committed; the web app reads them.
+    recordings_dir: Path = REPO_ROOT / "data" / "recordings"
 
     # Off by default. The project must cost $0, so a model billed per token is
     # refused unless this is set on purpose.

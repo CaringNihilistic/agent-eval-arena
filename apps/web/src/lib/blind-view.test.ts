@@ -2,7 +2,8 @@ import type { TraceEvent } from "@arena/schema";
 import { describe, expect, it } from "vitest";
 
 import {
-  blindMatchView,
+  BLIND_TIMESTAMP,
+  blindSides,
   blindView,
   REDACTED_ERROR_MESSAGE,
   redactEvent,
@@ -17,11 +18,11 @@ const secrets = [...identifyingStrings(leftRun), ...identifyingStrings(rightRun)
 
 const baseOptions = {
   runId: "01JRUNOTHER000000000000000",
-  configName: "qwen-full",
-  displayName: "Qwen 3.8 27B, full prompt",
-  model: "groq/qwen/qwen3.8-27b",
-  provider: "groq",
-  modelFamily: "qwen",
+  configName: "claude-sonnet-full",
+  displayName: "Claude Sonnet 5.5, full prompt",
+  model: "claude-sonnet-5-5",
+  provider: "anthropic",
+  modelFamily: "claude",
   systemPrompt: "Solve the task.",
   passed: false,
 };
@@ -45,6 +46,10 @@ describe("the leak scan itself", () => {
     expect(reasons).toContain('"total_tokens" has a value');
     expect(reasons).toContain('"passed" has a value');
     expect(reasons).toContain('"score" has a value');
+    expect(reasons).toContain('"checks" has a value');
+    expect(reasons).toContain('"thinking" has a value');
+    expect(reasons).toContain('"latency_ms" has a value');
+    expect(reasons).toContain("a real timestamp");
     expect(reasons).toContain(`contains "${leftRun.config.model}"`);
     expect(reasons).toContain(`contains "${leftRun.runId}"`);
     expect(reasons).toContain(`contains "${leftRun.config.system_prompt}"`);
@@ -94,12 +99,32 @@ describe("blind view of one run", () => {
 
     expect(call.payload.output.content).toBe("I will compute it.");
     expect(call.payload.output.tool_calls[0].tool).toBe("calculator");
-    expect(call.payload.latency_ms).toBe(840);
     expect(result.payload.output).toBe("179.45");
     expect(finished.payload.final_answer).toBe("179.45");
     expect(finished.payload.steps).toBe(2);
-    expect(finished.payload.latency_ms).toBe(1730);
     expect(finished.payload.stop_reason).toBe("answered");
+  });
+
+  it("hides the thinking block, which only some models produce", () => {
+    const [stored] = only(leftRun.events, "llm_call");
+    const [call] = only(blind, "llm_call");
+
+    expect(stored.payload.output.thinking).toBe("Multiply the unit price by the quantity.");
+    expect(call.payload.output.thinking).toBeNull();
+    expect(JSON.stringify(blind)).not.toContain("Multiply the unit price");
+  });
+
+  it("hides every measure of speed: latencies and timestamps", () => {
+    const [call] = only(blind, "llm_call");
+    const [result] = only(blind, "tool_result");
+    const [finished] = only(blind, "run_finished");
+
+    expect(call.payload.latency_ms).toBeNull();
+    expect(result.payload.latency_ms).toBeNull();
+    expect(finished.payload.latency_ms).toBeNull();
+    expect(new Set(blind.map((event) => event.timestamp))).toEqual(new Set([BLIND_TIMESTAMP]));
+    // The stored run really does have different times to hide.
+    expect(new Set(leftRun.events.map((event) => event.timestamp)).size).toBeGreaterThan(1);
   });
 
   it("does not modify the stored events", () => {
@@ -112,22 +137,22 @@ describe("blind view of one run", () => {
 });
 
 describe("redaction rules", () => {
-  it.each(["max_tokens", "max_cost"] as const)("hides the %s stop reason", (stopReason) => {
-    const run = recordedRun({ ...baseOptions, stopReason });
-    const [finished] = only(blindView(run.events, MATCH_ID, "right"), "run_finished");
-
-    expect(finished.payload.stop_reason).toBeNull();
-  });
-
-  it.each(["answered", "max_steps", "timeout", "error"] as const)(
-    "keeps the %s stop reason",
+  it.each(["max_tokens", "max_cost", "timeout"] as const)(
+    "hides the %s stop reason",
     (stopReason) => {
       const run = recordedRun({ ...baseOptions, stopReason });
       const [finished] = only(blindView(run.events, MATCH_ID, "right"), "run_finished");
 
-      expect(finished.payload.stop_reason).toBe(stopReason);
+      expect(finished.payload.stop_reason).toBeNull();
     },
   );
+
+  it.each(["answered", "max_steps", "error"] as const)("keeps the %s stop reason", (stopReason) => {
+    const run = recordedRun({ ...baseOptions, stopReason });
+    const [finished] = only(blindView(run.events, MATCH_ID, "right"), "run_finished");
+
+    expect(finished.payload.stop_reason).toBe(stopReason);
+  });
 
   it("replaces an error's text, which can name the model", () => {
     const blind = blindView(rightRun.events, MATCH_ID, "right");
@@ -146,11 +171,11 @@ describe("redaction rules", () => {
   });
 });
 
-describe("the replay payload sent before a vote", () => {
-  const payload = blindMatchView(MATCH_ID, { left: leftRun.events, right: rightRun.events });
+describe("both sides as sent before a vote", () => {
+  const payload = blindSides(MATCH_ID, { left: leftRun.events, right: rightRun.events });
   const serialized = JSON.stringify(payload);
 
-  it("never contains model names, config names, cost, tokens, or pass/fail", () => {
+  it("never contains model names, config names, cost, tokens, speed, thinking, or pass/fail", () => {
     expect(findLeaks(payload, secrets)).toEqual([]);
   });
 
@@ -160,18 +185,12 @@ describe("the replay payload sent before a vote", () => {
     }
     expect(serialized).not.toContain("score_computed");
     expect(serialized).not.toContain('"passed"');
+    expect(serialized).not.toContain("2026-10-02");
   });
 
-  it("carries only steps, elapsed time, and the answer as the summary", () => {
-    expect(payload.voted).toBe(false);
-    expect(payload.sides.left.summary).toEqual({
-      finished: true,
-      steps: 2,
-      elapsed_ms: 1730,
-      final_answer: "179.45",
-    });
-    expect(Object.keys(payload.sides.right.summary).sort()).toEqual([
-      "elapsed_ms",
+  it("carries only the step count and the answer as the summary", () => {
+    expect(payload.left.summary).toEqual({ finished: true, steps: 2, final_answer: "179.45" });
+    expect(Object.keys(payload.right.summary).sort()).toEqual([
       "final_answer",
       "finished",
       "steps",
@@ -179,10 +198,10 @@ describe("the replay payload sent before a vote", () => {
   });
 
   it("keeps the two sides apart", () => {
-    expect(new Set(payload.sides.left.events.map((event) => event.run_id))).toEqual(
+    expect(new Set(payload.left.events.map((event) => event.run_id))).toEqual(
       new Set([sideAlias(MATCH_ID, "left")]),
     );
-    expect(new Set(payload.sides.right.events.map((event) => event.run_id))).toEqual(
+    expect(new Set(payload.right.events.map((event) => event.run_id))).toEqual(
       new Set([sideAlias(MATCH_ID, "right")]),
     );
   });
@@ -192,11 +211,6 @@ describe("summary of a run still in progress", () => {
   it("reports the step reached and no answer", () => {
     const partial = blindView(leftRun.events.slice(0, 4), MATCH_ID, "left");
 
-    expect(summarizeBlindSide(partial)).toEqual({
-      finished: false,
-      steps: 1,
-      elapsed_ms: null,
-      final_answer: null,
-    });
+    expect(summarizeBlindSide(partial)).toEqual({ finished: false, steps: 1, final_answer: null });
   });
 });

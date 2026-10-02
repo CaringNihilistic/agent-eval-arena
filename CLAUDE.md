@@ -1,6 +1,6 @@
 # Agent Eval Arena
 
-Side-by-side agent evaluation: two agent configs run the same task, their traces stream into a split view, a scorecard compares them, and a blind vote feeds an Elo leaderboard next to an objective one.
+Side-by-side agent evaluation: three Claude models ran the same 30 tasks; a visitor sees two recorded runs side by side, votes blind, then sees the models, our measured results, and Anthropic's published benchmarks. Votes feed an Elo ranking shown next to the official-benchmark ranking and our scorer.
 
 The project exists to show skill in agent evaluation and observability. Correct trace data, honest scoring, and reproducibility outrank visual polish.
 
@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current phase: 3 complete with the revised six-category task bank (Checkpoint A, four-run Claude pilot done). Next: Phase 4. With the owner: approval of the sandbox's Mermaid dependencies, the web markdown and Mermaid dependencies for Phase 5, and replacing the Gemini pair with gpt-oss-20b.** Update this line at the end of every phase.
+**Current state: Checkpoint B complete. Three Claude configs, 90 runs recorded, replay site working locally. Next (not started, needs the owner's go): README results, deployment to Vercel and Neon, end-to-end test, polish. `docs/PLAN.md` Section 0 is the current design.** Update this line at the end of every checkpoint.
 
 ## How we work
 
@@ -33,11 +33,11 @@ docs/            PLAN.md, DECISIONS.md
 
 ## Stack
 
-- **Frontend:** Next.js 16 (App Router), TypeScript strict, Tailwind CSS, shadcn/ui, React Flow, Recharts, TanStack Query. Tests: Vitest, React Testing Library, one Playwright end-to-end test.
-- **Backend:** Python 3.11+, FastAPI, Pydantic v2, LangGraph, LiteLLM, SQLAlchemy 2.0, Alembic. Tests: pytest.
-- **Database:** SQLite for the local run store (Python). Postgres for votes and rate-limit counters (Docker locally, Neon Free in public).
-- **Hosting:** Vercel Hobby (web) and Neon Free (Postgres). The Python backend is never hosted; live mode is local-only.
-- **Streaming:** Server-Sent Events for local live matches. Public replays are one JSON response, paced in the browser.
+- **Frontend:** Next.js 16 (App Router), TypeScript strict, Tailwind CSS, shadcn/ui, TanStack Query, react-markdown with remark-gfm, Mermaid, the `postgres` driver. React Flow and Recharts are installed and not yet used. Tests: Vitest, React Testing Library, one Playwright end-to-end test.
+- **Backend:** Python 3.11+, FastAPI, Pydantic v2, Claude Agent SDK. LangGraph and LiteLLM remain for the unused LiteLLM backend. Used only to record runs. Tests: pytest.
+- **Database:** Postgres for votes and rate-limit counters (Docker locally on port 5433, Neon Free in public). Recorded runs are JSONL files in `data/recordings/`; there is no run database.
+- **Hosting:** Vercel Hobby (web) and Neon Free (Postgres). The Python backend is never hosted. There is no live mode.
+- **Replay:** one JSON response per match, played in the browser. Before the vote it plays at one fixed pace, because speed identifies the model.
 - **Tooling:** uv (inside containers), pnpm (host), ruff, mypy, eslint, prettier, docker-compose.
 
 ## Environment
@@ -54,7 +54,7 @@ docs/            PLAN.md, DECISIONS.md
 ## Commands
 
 ```
-pnpm dev:local                         # api + sandbox in Docker, web on the host (3100)
+pnpm dev:local                         # Postgres in Docker, web on the host (3100)
 pnpm dev:stop                          # stop and remove the containers
 pnpm web:prodcheck                     # production build of the web app in a container
 docker compose up                      # api (8000) and sandbox (internal only), no web
@@ -67,12 +67,13 @@ pnpm schema:gen                        # regenerate TS and Pydantic types from t
 pnpm schema:check                      # fail if generated types are stale
 node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 docker compose exec api uv run arena list
-docker compose exec api uv run arena eval --config qwen-full --delay 45   # real runs over the 30-task bank
-docker compose exec api uv run arena run --config qwen-full --task dev-math-01
+docker compose up -d --wait api sandbox                 # needed only to record or run agents
+docker compose exec api uv run arena record             # record every missing run; resumable; uses the subscription
+docker compose exec api uv run arena record --index-only   # rebuild runs-index, matches, tasks
 docker compose exec api uv run arena run --config claude-haiku-full --task dev-math-01   # uses the subscription
 ```
 
-Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena export` (Phase 4), `arena record --pilot` (Phase 8).
+Planned, not yet available: `pnpm test:e2e`. The Postgres store tests run only when `TEST_DATABASE_URL` is set (see `apps/web/src/server/store.pg.test.ts`).
 
 ## Where things are (backend)
 
@@ -85,7 +86,12 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena export` (Phase 4),
 - `apps/api/tests/fakes.py`: the scripted model client. Tests never call a real model.
 - `apps/api/tests/recorded/`: responses real providers returned, used as regression fixtures. When a real run breaks, save the response there (`arena run --dump-raw`) and write the test from it.
 - `apps/sandbox/src/sandbox/executor.py`: sandboxed execution. Its tests are escape attempts and must run inside the sandbox container.
-- `apps/web/src/lib/blind-view.ts`: the only redaction code. `apps/web/src/test/leak-scan.ts` is the check every blind response must pass.
+- `apps/api/src/arena/recording.py`: the recorder and the index builder. The files it writes are the only run store.
+- `apps/web/src/lib/blind-view.ts`: the only redaction code. `apps/web/src/test/leak-scan.ts` is the check every blind response must pass; `match-service.test.ts` runs it over all 90 recorded matches.
+- `apps/web/src/server/`: `recordings.ts` reads `data/`, `store.ts` is the Postgres vote store, `match-service.ts` holds the match, vote, rate-limit, and reveal rules. Route handlers in `src/app/api/` only translate HTTP.
+- `apps/web/src/lib/`: `elo.ts`, `stats.ts`, `leaderboard.ts` are the only implementations of Elo, intervals, agreement, length bias, and the official ranking.
+- `apps/web/src/components/answer-view.tsx`, `mermaid-diagram.tsx`: the only places model output is rendered as markdown or as a diagram.
+- `data/official-benchmarks.json`: Anthropic's published scores. Copy from the official page, never from memory; keep the source URL and update `checked`.
 - `apps/api/src/arena/scoring.py`: the five scorers. `apps/api/tests/test_task_bank.py` re-derives every expected answer; a new task needs an entry there.
 - `configs/`, `tasks/`: agent configs, prompts, tasks, fixtures, corpus, checkers. `tasks/tools/make_fixtures.py` regenerates the fixtures.
 
@@ -109,26 +115,28 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena export` (Phase 4),
 
 ### Blind voting
 
-- Before the vote the UI shows only the traces, the final answers, step count, and elapsed time. Pass/fail, score, cost, tokens, and config names are revealed together after the vote.
-- Until a voter has voted on a match, the server withholds config, model, system prompt, run id, token counts, cost, and the `score_computed` event from everything it serves for that match (PLAN Section 4.1). Redaction happens on the server, never in the browser.
-- Any new field that reveals the result, the cost, or the identity of a side must be added to the blind-view redaction and its test.
-- Every vote stores both sides' pass/fail state.
+- Before the vote the UI shows only the traces, the final answers, and the step count. Models, pass/fail, constraint checks, cost, tokens, thinking, and all timing are revealed together after the vote.
+- Until a voter has voted on a match, the server withholds config, model, system prompt, run id, token counts, cost, thinking blocks, latencies, real timestamps, and the `score_computed` event (PLAN Section 4.1). Redaction happens on the server, never in the browser.
+- Nothing shown before the vote may depend on recorded time. The blind replay uses one fixed pace.
+- Any new field that reveals the result, the cost, the speed, or the identity of a side must be added to the blind-view redaction and to `WITHHELD_KEYS` in the leak scan.
+- Every vote stores both sides' pass/fail state and answer lengths.
+- Model output is untrusted. Render it only through `AnswerView`: markdown with no raw-HTML plugin, Mermaid at the strict security level.
 
 ### Cost and safety
 
 - **The project costs $0.** No paid API usage and no paid hosting, ever, unless the owner explicitly says otherwise.
-- The runner refuses any model not marked `free_tier` in the pricing table. The only bypass is an explicit override (`--allow-paid` or `ARENA_ALLOW_PAID_MODELS=1`); never set it on your own initiative.
+- The runner refuses any model not marked free or subscription in the pricing table. The only bypass is an explicit override (`--allow-paid` or `ARENA_ALLOW_PAID_MODELS=1`); never set it on your own initiative.
 - Model names, free-tier limits, and prices come from official provider pages, never from memory. Record the source URL and the date checked in the pricing table and in `docs/DECISIONS.md`.
 - Record both `cost_usd` (actually charged) and `reference_cost_usd` (at paid list price). Never present the reference figure as money spent.
 - Rate-limit waits are excluded from latency, timeouts, and replay pacing. A run interrupted by rate limiting is re-run, never recorded as an agent failure.
-- Gemini and Groq calls go through LiteLLM. Claude calls go only through the Claude Agent SDK on the owner's subscription login (`CLAUDE_CODE_OAUTH_TOKEN`). Never send a Claude request with an API key, and never set `ANTHROPIC_API_KEY` or any variable in `claude_auth.FORBIDDEN_VARIABLES`.
+- Claude calls go only through the Claude Agent SDK on the owner's subscription login (`CLAUDE_CODE_OAUTH_TOKEN`). Never send a Claude request with an API key, and never set `ANTHROPIC_API_KEY` or any variable in `claude_auth.FORBIDDEN_VARIABLES`.
 - The Claude backend is local only. It is never deployed, and nothing in `apps/web` may reference it.
 - Claude runs use the owner's Pro allowance. Do not run them without being asked, keep them sequential, and stop cleanly at a usage limit.
 - Never hardcode API keys. Real keys go in `.env` only. `.env.example` is committed to a public repo and must keep every secret empty; `pnpm lint` checks this.
 - No test may call a real model. Use the scripted fake client.
 - Recordings written to `data/recordings/` are scrubbed of API keys, auth headers, and `.env` values, and a test fails if a key-like pattern appears there.
-- Before recording all 120 runs, run the 10-run pilot, report tokens per run, pass rates, and the projected duration, and wait for approval.
-- Task content is synthetic only: free-tier inputs may be reviewed or used for training by the provider.
+- The 90 runs are recorded. Do not re-record or add runs without being asked: a new run replaces a file that matches and votes refer to.
+- Task content is synthetic only.
 - Agent tools have no live web access. `python_exec` runs only in the sandbox container. Never mount the Docker socket.
 - Rate limit counters live in the database, not in memory.
 - The repo is public. Scan history for secrets before pushing anything that touches credentials or recordings.
@@ -147,5 +155,5 @@ Next.js 16 has breaking changes relative to older versions. Before writing front
 
 ### Git
 
-- Commit at the end of each phase, and at sensible points within one, with clear messages.
-- Local commits only. Do not add a remote or push unless asked.
+- Commit at the end of each checkpoint, and at sensible points within one, with clear messages.
+- Push to `origin` at the end of each checkpoint, after scanning history for secrets.
