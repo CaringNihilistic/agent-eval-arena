@@ -61,6 +61,18 @@ test("the lobby shows every mode, the player's rank, and the six guests", async 
   await expect(page.getByText("Spotted the Impostor")).toBeVisible();
   await expect(page.getByRole("img", { name: "Colonel Archibald Pike" })).toBeVisible();
   await expect(page.locator("img[data-expression]")).toHaveCount(6);
+
+  // The picture of the Hall is a way in: pointing at a part names the room, clicking enters it.
+  const clock = page.getByRole("link", { name: /^Does the Timetable Hold\?: the tower clock/ });
+  await clock.hover();
+  await expect(page.getByTestId("hall-caption")).toContainText("The tower clock");
+  // A guest in the lobby brightens and speaks when pointed at.
+  const pike = page.getByRole("button", { name: /Colonel Archibald Pike/ });
+  await pike.hover();
+  await expect(page.getByTestId("guest-line")).toContainText("Facts, man! Facts! Then dinner.");
+  await expect(pike.locator("img")).toHaveAttribute("data-expression", "happy");
+  await page.getByRole("link", { name: /^A Weekend at Wrenfield: the front door/ }).click();
+  await expect(page).toHaveURL(/\/weekend/);
   expect(errors).toEqual([]);
 });
 

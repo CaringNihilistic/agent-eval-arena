@@ -234,3 +234,256 @@
     transform: rotate(-2deg);
   }
 }
+
+/*
+ * Motion. Everything here is decoration: the page reads the same with it off,
+ * and it is off for anyone who asks for reduced motion.
+ */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --rise: 18px;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rise));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  42% {
+    opacity: 0.8;
+  }
+  48% {
+    opacity: 0.96;
+  }
+  71% {
+    opacity: 0.86;
+  }
+}
+
+@keyframes light-up {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translateX(-36px);
+  }
+  to {
+    transform: translateX(36px);
+  }
+}
+
+@keyframes smoke {
+  from {
+    opacity: 0.55;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-46px) scale(1.9);
+  }
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A line being written, held, then cleared for the next. Paths set pathLength="1". */
+@keyframes write {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  38% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  88% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes pen-bob {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(-6px, -2px) rotate(-4deg);
+  }
+  50% {
+    transform: translate(-12px, 2px) rotate(2deg);
+  }
+  75% {
+    transform: translate(-5px, 3px) rotate(-2deg);
+  }
+}
+
+@keyframes stamp-down {
+  0% {
+    opacity: 0;
+    transform: scale(1.7) rotate(-14deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-6deg);
+  }
+}
+
+@layer components {
+  /* Rise into place on load. Stagger with style="--delay: 120ms". */
+  .rise {
+    animation: rise-in 700ms var(--ease-out) both;
+    animation-delay: var(--delay, 0ms);
+  }
+
+  /* Rise into place when scrolled into view (see components/lobby/reveal.tsx). */
+  .reveal {
+    opacity: 0;
+    transform: translateY(var(--rise));
+    transition:
+      opacity 700ms var(--ease-out),
+      transform 700ms var(--ease-out);
+    transition-delay: var(--delay, 0ms);
+  }
+  .reveal[data-shown="true"] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* A card that lifts toward the reader. */
+  .lift {
+    transition:
+      transform 220ms var(--ease-out),
+      box-shadow 220ms var(--ease-out);
+  }
+  .lift:hover,
+  .lift:focus-within {
+    transform: translateY(-6px) rotate(-0.4deg);
+    box-shadow: 0 10px 0 -4px var(--line);
+  }
+
+  /* The scene of the Hall. */
+  .scene .star {
+    animation: twinkle 3.6s ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+  .scene .cloud {
+    animation: drift 26s ease-in-out infinite alternate;
+    animation-delay: var(--delay, 0s);
+  }
+  .scene .puff {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: smoke 5s ease-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+  .scene .lit {
+    animation:
+      light-up 900ms ease-out both,
+      flicker 4.5s ease-in-out infinite;
+    animation-delay: var(--delay, 0s), calc(var(--delay, 0s) + 900ms);
+  }
+  .scene .hand {
+    animation: turn var(--period, 60s) linear infinite;
+  }
+  .scene .ink {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: write 9s ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+  .scene .pen {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: pen-bob 3s ease-in-out infinite;
+  }
+  .scene .seal {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: stamp-down 700ms var(--ease-out) 1.4s both;
+  }
+
+  /* A part of the Hall that leads somewhere: the door, a window, the clock, the post box. */
+  .spot {
+    cursor: pointer;
+    outline: none;
+  }
+  .spot .halo {
+    opacity: 0;
+    transition: opacity 180ms ease-out;
+  }
+  .spot:hover .halo,
+  .spot:focus-visible .halo,
+  .spot[data-active="true"] .halo {
+    opacity: 1;
+  }
+  .spot .glass {
+    transition: fill 180ms ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .scene .star,
+  .scene .cloud,
+  .scene .puff,
+  .scene .lit,
+  .scene .hand,
+  .scene .ink,
+  .scene .pen,
+  .scene .seal {
+    animation: none;
+  }
+  .scene .ink {
+    stroke-dashoffset: 0;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .lift,
+  .lift:hover,
+  .lift:focus-within {
+    transition: none;
+    transform: none;
+  }
+}
