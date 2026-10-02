@@ -1,0 +1,22 @@
+id: diagram-05
+title: "Flowchart of a release pipeline"
+category: diagram
+difficulty: medium
+prompt: |
+  Draw a Mermaid flowchart of this release pipeline. A commit triggers lint, then tests, then a build. If any of those three fails, the team is notified and the pipeline stops. After a successful build the release is deployed to staging. A person must give manual approval; if approved it is deployed to production, and if rejected the pipeline stops.
+  Limits: at most 22 lines. Answer with the Mermaid code only, with no explanation.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "mermaid", "diagram": "flowchart"}
+    - {"type": "max_lines", "value": 22}
+    - {"type": "mentions", "name": "shows every stage", "all_of": ["lint", "test", "build", "staging", "approv", "production"]}
+    - {"type": "mentions", "name": "shows the failure path", "any_of": ["notify", "notif"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "flowchart TD\n  A[Commit] --> B[Lint]\n  B -- pass --> C[Tests]\n  C -- pass --> D[Build]\n  B -- fail --> N[Notify team]\n  C -- fail --> N\n  D -- fail --> N\n  D -- pass --> E[Deploy to staging]\n  E --> F{Manual approval?}\n  F -- approved --> G[Deploy to production]\n  F -- rejected --> H[Stop]\n  N --> H"
+  wrong:
+    - "flowchart TD\n  A[Commit] --> B[Lint] --> C[Tests] --> D[Build] --> E[Deploy to production]"
+    - "flowchart TD\n  A[Commit --> B[Lint\n  B --> staging approval production notify test build"

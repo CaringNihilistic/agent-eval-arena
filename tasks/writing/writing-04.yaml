@@ -1,0 +1,25 @@
+id: writing-04
+title: "Story opening under constraints"
+category: writing
+difficulty: hard
+prompt: |
+  Write the opening of a short story.
+  Limits: exactly three sentences and at most 60 words. Tell it in the first person. Set it in a lighthouse. Include the word 'tide'. Do not use the word 'suddenly'.
+  Answer with the story opening only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "sentences", "min": 3, "max": 3}
+    - {"type": "max_words", "value": 60}
+    - {"type": "mentions", "name": "set in a lighthouse", "any_of": ["lighthouse"]}
+    - {"type": "mentions", "name": "includes 'tide'", "any_of": ["tide"]}
+    - {"type": "pattern", "name": "told in the first person", "pattern": "\\b(I|I'm|I'd|I've|my|My|me)\\b"}
+    - {"type": "excludes", "name": "does not use 'suddenly'", "terms": ["suddenly"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "I had kept the lighthouse for eleven winters before the lamp went out. The tide was already at the lowest step when I found the oil gone and the door unlatched. Nobody had rowed out here in a month."
+  wrong:
+    - "The keeper climbed the lighthouse stairs. Suddenly the tide rose."
+    - "I kept the lighthouse. The tide came in. It was cold. The lamp failed."

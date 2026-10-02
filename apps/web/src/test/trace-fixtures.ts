@@ -132,6 +132,7 @@ export function recordedRun(options: RunOptions): FixtureRun {
         score: options.passed ? 1 : 0,
         scorer_type: "numeric_tolerance",
         explanation: options.passed ? "Within tolerance." : "Expected 179.45.",
+        checks: [],
       },
     },
   );

@@ -1,0 +1,25 @@
+id: writing-05
+title: "Declining an invitation"
+category: writing
+difficulty: medium
+prompt: |
+  Write a reply from Jonas Weber declining an invitation to speak at a conference on 12 March, because he will be travelling.
+  Limits: at most 90 words. The first line must be 'Dear Ms Albrecht,'. Thank her, say clearly that he cannot attend, mention the date, and offer an alternative: a later event or a colleague who could speak.
+  Answer with the reply only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 90}
+    - {"type": "starts_with", "label": "Dear Ms Albrecht,"}
+    - {"type": "mentions", "name": "thanks the organiser", "any_of": ["thank"]}
+    - {"type": "mentions", "name": "says he cannot attend", "any_of": ["cannot", "can't", "unable", "not be able", "won't be able"]}
+    - {"type": "mentions", "name": "mentions the date", "any_of": ["12 March", "March 12"]}
+    - {"type": "mentions", "name": "offers an alternative", "any_of": ["colleague", "later", "another", "future", "next"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Dear Ms Albrecht,\n\nThank you for inviting me to speak at the conference on 12 March. I am sorry to say that I cannot attend, as I will be travelling that week.\n\nI would be glad to speak at a later event, and my colleague Dr Lena Fischer knows this subject well and may be free on the day. I am happy to introduce you.\n\nWith best wishes,\nJonas Weber"
+  wrong:
+    - "Hi, thanks but no. Jonas"
+    - "Dear Ms Albrecht,\n\nI will be there on 12 March and look forward to it.\n\nJonas Weber"

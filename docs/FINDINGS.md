@@ -100,3 +100,19 @@ Requests refused with HTTP 503 appear to count against the daily quota: `gemini-
 ## 8. One run can exceed Groq's per-minute limit by itself
 
 **Observed 2026-10-02**, `groq/qwen/qwen3.8-27b`. A single four-step run used 7,230 tokens, over the 7,000 input tokens a minute Groq enforces, and was cut off even with 45 seconds between runs. Spacing runs apart is not enough: the recorder has to pace individual model calls.
+
+## 7. Checkpoint A pilot: four Claude runs on the revised bank
+
+**Observed 2026-10-02.** One run each, on the subscription, actual cost $0.
+
+| Config               | Task                            | Result                    | Model calls | Tokens | Active time | Answer   |
+| -------------------- | ------------------------------- | ------------------------- | ----------- | ------ | ----------- | -------- |
+| `claude-haiku-full`  | `writing-04` (story opening)    | Constraints met 6/6       | 2           | 3,584  | 4.4 s       | 53 words |
+| `claude-sonnet-full` | `diagram-03` (sequence diagram) | Constraints met 4/4       | 1           | 1,764  | 2.4 s       | 12 lines |
+| `claude-opus-full`   | `code-04` (merge intervals)     | Pass, 8 of 8 hidden tests | 1           | 1,684  | 3.8 s       | 9 lines  |
+| `claude-opus-full`   | `agent-03` (multi-hop)          | Pass, 71                  | 3           | 5,677  | 7.6 s       | 1 word   |
+
+- **No run came near the 16,000-token cap.** The largest used 35% of it.
+- **Fixed cost per model call is about 1,400 input tokens**, and it dominates: 74% to 83% of each run's tokens. Most of that is not Claude Code's doing. By the size of each part in the captured requests, about 55% is the tool definitions and 17% the arena's system prompt, which every config on either backend sends; about 20% (the billing line, the identity line, and the environment and date reminders, roughly 170 to 200 tokens a call) is added by Claude Code. So the harness accounts for roughly a tenth of a Claude run's tokens. This is an estimate from character counts, not a token count.
+- **Haiku ran code to check its word count before submitting** the story opening. Tools are not inert on writing tasks.
+- **Four runs say nothing about quality or separation.** All four results were clean; whether the bank separates configs is a question for the full recording and the votes.

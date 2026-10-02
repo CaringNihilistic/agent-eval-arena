@@ -10,3 +10,4 @@
 **/.ruff_cache
 .pnpm-store
 docs
+.dev-dumps

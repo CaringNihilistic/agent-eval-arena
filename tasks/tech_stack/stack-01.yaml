@@ -1,0 +1,29 @@
+id: stack-01
+title: "Booking site for a dance studio"
+category: tech_stack
+difficulty: easy
+prompt: |
+  Recommend a technology stack for this project.
+
+  A dance studio wants a website where about 300 students can book and pay for classes. Two developers will build it in 6 weeks. Hosting must cost no more than $50 a month.
+
+  Limits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.
+  Answer with the recommendation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 150}
+    - {"type": "section", "label": "Stack:"}
+    - {"type": "section_lines", "label": "Reasoning:", "min": 3, "max": 5, "until": ["Stack:"]}
+    - {"type": "mentions", "name": "refers to the budget", "any_of": ["$50", "budget"]}
+    - {"type": "mentions", "name": "refers to the team", "any_of": ["two developers", "two-person", "2 developers", "small team", "team of two"]}
+    - {"type": "mentions", "name": "refers to the deadline", "any_of": ["6 weeks", "six weeks", "deadline"]}
+    - {"type": "mentions", "name": "refers to the scale", "any_of": ["300"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Stack: Next.js, PostgreSQL on a managed free tier, Stripe Checkout, hosted on Vercel\nReasoning:\nOne framework for pages and server code suits a team of two developers.\nStripe Checkout and a managed database avoid weeks of custom work, which matters with a 6 weeks deadline.\nFree and hobby tiers keep hosting under the $50 budget.\n300 students is a tiny load, so a single small database is enough."
+  wrong:
+    - "Use Kubernetes, Kafka, and microservices."
+    - "Stack: Next.js\nReasoning:\nIt is good."

@@ -62,14 +62,14 @@ Each piece of logic exists once. Redaction, voting, Elo, and agreement are writt
 
 ### 2.2 Components
 
-| Component          | Responsibility                                                                                         |
-| ------------------ | ------------------------------------------------------------------------------------------------------ |
-| `apps/web`         | UI, plus route handlers for matches, blind view, votes, leaderboards. Proxies live runs to `apps/api`. |
-| `apps/api`         | Runner, scorers, run store, live-run SSE, `arena` CLI. Reachable only from the web server, locally.    |
-| `apps/sandbox`     | Executes Python for `python_exec` and `python_check`. Holds no secrets.                                |
-| `packages/schema`  | Single JSON Schema for trace events; generates TS types and Pydantic models.                           |
-| `tasks/`           | Task bank (YAML), CSV fixtures, doc corpus, checker functions. YAML is the source of truth.            |
-| `data/recordings/` | Exported recorded runs, replay matches, and a run index. Scrubbed, committed.                          |
+| Component          | Responsibility                                                                                                    |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `apps/web`         | UI, plus route handlers for matches, blind view, votes, leaderboards. Proxies live runs to `apps/api`.            |
+| `apps/api`         | Runner, scorers, run store, live-run SSE, `arena` CLI. Reachable only from the web server, locally.               |
+| `apps/sandbox`     | Executes Python for `python_exec` and `python_check`, and checks that a Mermaid diagram parses. Holds no secrets. |
+| `packages/schema`  | Single JSON Schema for trace events; generates TS types and Pydantic models.                                      |
+| `tasks/`           | Task bank (YAML), CSV fixtures, doc corpus, checker functions. YAML is the source of truth.                       |
+| `data/recordings/` | Exported recorded runs, replay matches, and a run index. Scrubbed, committed.                                     |
 
 ### 2.3 Sandbox isolation
 
@@ -80,6 +80,7 @@ Built and verified in Phase 1. The sandbox is a separate container:
 - Each execution is a fresh subprocess in a fresh temp directory with `RLIMIT_AS`, `RLIMIT_CPU`, `RLIMIT_NPROC`, `RLIMIT_FSIZE`, and a hard wall-clock kill.
 - Task fixtures are mounted read-only. The container has no API keys and no database credentials.
 - Output is truncated at a fixed byte limit before it returns to the API.
+- The image also carries Node 22 with `mermaid` 12.0.0 and `jsdom` 30.1.1, pinned by a lockfile and installed at build time. `POST /mermaid/parse` runs the real Mermaid parser on a diagram under the same subprocess limits and returns whether it parsed. Nothing is drawn. The answer is passed as data, never as code.
 
 The Docker socket is never mounted anywhere.
 
@@ -153,33 +154,35 @@ All ids are ULIDs stored as text. All timestamps are UTC.
 
 **`tasks`** (synced from YAML; never edited through the API)
 
-| Field                                       | Type    | Notes                                                                                      |
-| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------ |
-| `id`                                        | text PK | Slug from the YAML file                                                                    |
-| `title`, `category`, `prompt`, `difficulty` | text    | Category is one of `math`, `data_analysis`, `multi_hop`, `tool_trap`                       |
-| `scorer_type`                               | text    | `exact`, `numeric_tolerance`, `regex`, `python_check`, `llm_judge`                         |
-| `scorer_config`                             | JSON    | Expected answer, tolerance, pattern, checker reference, or rubric. Never sent to a browser |
-| `required_tools`                            | JSON    | Tools the task needs                                                                       |
-| `content_hash`                              | text    | Hash of the YAML; stamped onto each run                                                    |
+| Field                                       | Type    | Notes                                                                                                                          |
+| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                                        | text PK | Slug from the YAML file                                                                                                        |
+| `title`, `category`, `prompt`, `difficulty` | text    | Category is one of `writing`, `diagram`, `explanation`, `tech_stack`, `code`, `agent`                                          |
+| `scorer_type`                               | text    | `exact`, `numeric_tolerance`, `regex`, `python_check`, `constraints`, `llm_judge`                                              |
+| `scorer_config`                             | JSON    | Expected answer, tolerance, pattern, checker reference, hidden test cases, constraint list, or rubric. Never sent to a browser |
+| `required_tools`                            | JSON    | Tools the task needs                                                                                                           |
+| `content_hash`                              | text    | Hash of the YAML; stamped onto each run                                                                                        |
 
 **`runs`**
 
-| Field                                                | Type           | Notes                                                   |
-| ---------------------------------------------------- | -------------- | ------------------------------------------------------- |
-| `id`                                                 | text PK        |                                                         |
-| `config_id`, `task_id`, `task_hash`                  |                |                                                         |
-| `source`                                             | text           | `recording` or `live`                                   |
-| `status`                                             | text           | `pending`, `running`, `finished`, `failed`, `abandoned` |
-| `stop_reason`                                        | text, nullable | Section 4                                               |
-| `final_answer`                                       | text, nullable |                                                         |
-| `passed`, `score`, `score_explanation`               |                |                                                         |
-| `prompt_tokens`, `completion_tokens`, `total_tokens` | int            | Provider-reported                                       |
-| `cost_usd`                                           | numeric        | Actually charged                                        |
-| `reference_cost_usd`                                 | numeric        | At paid list price                                      |
-| `steps`, `tool_calls`                                | int            |                                                         |
-| `latency_ms`                                         | int            | Active time                                             |
-| `wall_clock_ms`                                      | int            | Including throttle waits                                |
-| `started_at`, `finished_at`                          | timestamp      |                                                         |
+| Field                                                | Type           | Notes                                                                                       |
+| ---------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| `id`                                                 | text PK        |                                                                                             |
+| `config_id`, `task_id`, `task_hash`                  |                |                                                                                             |
+| `source`                                             | text           | `recording` or `live`                                                                       |
+| `status`                                             | text           | `pending`, `running`, `finished`, `failed`, `abandoned`                                     |
+| `stop_reason`                                        | text, nullable | Section 4                                                                                   |
+| `final_answer`                                       | text, nullable |                                                                                             |
+| `passed`, `score`, `score_explanation`               |                | `passed` is null for constraint-scored tasks (Section 7.2)                                  |
+| `checks`                                             | JSON           | The constraint checks, each with a name, a verdict, and a detail. Empty for pass/fail tasks |
+| `answer_words`                                       | int            | Word count of the final answer, counted once, in Python, when the run finishes              |
+| `prompt_tokens`, `completion_tokens`, `total_tokens` | int            | Provider-reported                                                                           |
+| `cost_usd`                                           | numeric        | Actually charged                                                                            |
+| `reference_cost_usd`                                 | numeric        | At paid list price                                                                          |
+| `steps`, `tool_calls`                                | int            |                                                                                             |
+| `latency_ms`                                         | int            | Active time                                                                                 |
+| `wall_clock_ms`                                      | int            | Including throttle waits                                                                    |
+| `started_at`, `finished_at`                          | timestamp      |                                                                                             |
 
 **`trace_events`**: `run_id`, `seq` (unique with `run_id`, strictly increasing, no gaps), `type`, `timestamp`, `payload` (validated against the schema before insert). `side` is not stored; it belongs to the match.
 
@@ -191,26 +194,27 @@ All ids are ULIDs stored as text. All timestamps are UTC.
 | ----------------- | ---------------------------------------------------------------------------------------------------- |
 | `runs/*.jsonl`    | One file per recorded run: the config snapshot, the task id and hash, metrics, score, and all events |
 | `runs-index.json` | One row per run with its metrics and pass/fail, for the leaderboards                                 |
-| `matches.json`    | The 180 replay matches: id, task, left and right run ids. Side assignment is randomised once, seeded |
+| `matches.json`    | The 360 replay matches: id, task, left and right run ids. Side assignment is randomised once, seeded |
 | `tasks.json`      | Public task fields only (title, category, prompt, difficulty). No expected answers                   |
 
-A match references two runs and does not own them: 120 recorded runs (4 configs × 30 tasks) make 180 replay matches (6 config pairs × 30 tasks).
+A match references two runs and does not own them. With eight configs in two backend groups of four, 240 recorded runs (8 configs × 30 tasks) make 360 replay matches (6 config pairs × 30 tasks × 2 groups); matches stay within a group.
 
 ### 3.3 Postgres (Docker locally, Neon free plan in public)
 
 **`votes`**
 
-| Field                               | Type      | Notes                                                 |
-| ----------------------------------- | --------- | ----------------------------------------------------- |
-| `id`                                | bigserial | Monotonic; tiebreak for Elo ordering                  |
-| `match_id`                          | text      | Unique with `voter_id`                                |
-| `voter_id`                          | text      | Anonymous id generated by the browser                 |
-| `ip_hash`                           | text      | Keyed hash of the IP; the raw IP is never stored      |
-| `choice`                            | text      | `left`, `right`, `tie`, `both_bad`                    |
-| `left_config_id`, `right_config_id` | text      | Denormalised so the vote log is self-contained        |
-| `left_passed`, `right_passed`       | bool      | Snapshot of both scorer results, stored on every vote |
-| `task_category`                     | text      | For category filters without a join                   |
-| `created_at`                        | timestamp |                                                       |
+| Field                                     | Type           | Notes                                                                                   |
+| ----------------------------------------- | -------------- | --------------------------------------------------------------------------------------- |
+| `id`                                      | bigserial      | Monotonic; tiebreak for Elo ordering                                                    |
+| `match_id`                                | text           | Unique with `voter_id`                                                                  |
+| `voter_id`                                | text           | Anonymous id generated by the browser                                                   |
+| `ip_hash`                                 | text           | Keyed hash of the IP; the raw IP is never stored                                        |
+| `choice`                                  | text           | `left`, `right`, `tie`, `both_bad`                                                      |
+| `left_config_id`, `right_config_id`       | text           | Denormalised so the vote log is self-contained                                          |
+| `left_passed`, `right_passed`             | bool, nullable | Snapshot of both scorer results, stored on every vote. Null for constraint-scored tasks |
+| `left_answer_words`, `right_answer_words` | int            | Snapshot of both answer lengths, for the length-bias stat                               |
+| `task_category`                           | text           | For category filters without a join                                                     |
+| `created_at`                              | timestamp      |                                                                                         |
 
 **`rate_limit_counters`**: `bucket` (`scope:ip_hash`), `window_start`, `count`. Fixed windows, incremented with one atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING count`. Counters live in the database so they survive restarts and are shared across serverless instances.
 
@@ -233,7 +237,7 @@ Envelope: `run_id`, `side` (`left`, `right`, or null on run permalinks), `seq`, 
 | `tool_result`    | `call_id`, `output` (truncated), `truncated`, `success`, `latency_ms`, `error`                                                           |
 | `step_finished`  | `step`, cumulative `total_tokens`, `cost_usd`, `reference_cost_usd`                                                                      |
 | `run_finished`   | `final_answer`, `cost_usd`, `reference_cost_usd`, `total_tokens`, `steps`, `latency_ms`, `stop_reason`                                   |
-| `score_computed` | `passed`, `score`, `scorer_type`, `explanation`                                                                                          |
+| `score_computed` | `passed` (null for constraint-scored tasks), `score`, `scorer_type`, `explanation`, `checks[]` (`name`, `passed`, `detail`)              |
 | `error`          | `message`, `recoverable`                                                                                                                 |
 
 `stop_reason` is one of `answered`, `max_steps`, `max_tokens`, `max_cost`, `timeout`, `error`.
@@ -259,6 +263,8 @@ Redaction happens on the server, in the web app's route handlers. Until the requ
 
 Still visible: step numbers, tool calls and results, model output, the final answer, latencies, and `error` events.
 
+The constraint checks travel in `score_computed`, so they are withheld with it. Answer length is not hidden and cannot be: the voter reads the answer.
+
 The schema marks every redactable field as nullable, so the blind view is valid against the same schema.
 
 ## 5. API
@@ -267,19 +273,20 @@ The schema marks every redactable field as nullable, so the blind view is valid 
 
 Requests carry `X-Voter-Id`, an anonymous UUID the browser generates and keeps in local storage. No cookies.
 
-| Method and path                             | Request                                                                                | Response                                                                                                                                                                        |
-| ------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/meta`                             |                                                                                        | `{live_available, categories}`                                                                                                                                                  |
-| `GET /api/tasks?category=`                  |                                                                                        | Public task fields                                                                                                                                                              |
-| `GET /api/configs`                          |                                                                                        | Configs seen in recordings (and local configs when live is available)                                                                                                           |
-| `POST /api/matches`                         | `{task_id \| "random", left_config_id \| "random", right_config_id \| "random", mode}` | `{match_id, mode}`. Replay picks an existing match the voter has not voted on. Live (local only) starts two runs through the Python API                                         |
-| `GET /api/matches/{id}`                     |                                                                                        | Task, `voted`, and per side: status, steps, elapsed time, final answer, and the event list in the blind view. After the vote: full events, scorecard, configs, run ids, tallies |
-| `GET /api/matches/{id}/events`              | `Last-Event-ID`                                                                        | Live matches only: SSE proxied from the Python API, redacted per event                                                                                                          |
-| `POST /api/matches/{id}/vote`               | `{choice}`                                                                             | `201 {reveal, scorecard, tallies}`; `409` if already voted or unfinished; `429` if rate limited                                                                                 |
-| `GET /api/runs/{id}`                        |                                                                                        | Run, config, metrics, score, events (unblinded permalink)                                                                                                                       |
-| `GET /api/leaderboard/preference?category=` |                                                                                        | `[{config, elo, ci_low, ci_high, votes, wins, losses, ties}]`                                                                                                                   |
-| `GET /api/leaderboard/objective?category=`  |                                                                                        | `[{config, runs, pass_rate, pass_ci, mean_reference_cost_usd, mean_steps, mean_latency_ms, passes_per_reference_dollar}]`                                                       |
-| `GET /api/leaderboard/agreement?category=`  |                                                                                        | `{decisive_votes, agreement_rate, ci, table, left_pick_rate}`                                                                                                                   |
+| Method and path                              | Request                                                                                | Response                                                                                                                                                                                         |
+| -------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/meta`                              |                                                                                        | `{live_available, categories}`                                                                                                                                                                   |
+| `GET /api/tasks?category=`                   |                                                                                        | Public task fields                                                                                                                                                                               |
+| `GET /api/configs`                           |                                                                                        | Configs seen in recordings (and local configs when live is available)                                                                                                                            |
+| `POST /api/matches`                          | `{task_id \| "random", left_config_id \| "random", right_config_id \| "random", mode}` | `{match_id, mode}`. Replay picks an existing match the voter has not voted on. Live (local only) starts two runs through the Python API                                                          |
+| `GET /api/matches/{id}`                      |                                                                                        | Task, `voted`, and per side: status, steps, elapsed time, final answer, and the event list in the blind view. After the vote: full events, scorecard, configs, run ids, tallies                  |
+| `GET /api/matches/{id}/events`               | `Last-Event-ID`                                                                        | Live matches only: SSE proxied from the Python API, redacted per event                                                                                                                           |
+| `POST /api/matches/{id}/vote`                | `{choice}`                                                                             | `201 {reveal, scorecard, tallies}`; `409` if already voted or unfinished; `429` if rate limited                                                                                                  |
+| `GET /api/runs/{id}`                         |                                                                                        | Run, config, metrics, score, events (unblinded permalink)                                                                                                                                        |
+| `GET /api/leaderboard/preference?category=`  |                                                                                        | `[{config, elo, ci_low, ci_high, votes, wins, losses, ties}]`                                                                                                                                    |
+| `GET /api/leaderboard/objective?category=`   |                                                                                        | `[{config, runs, scored_runs, pass_rate, pass_ci, constraint_runs, constraints_met_rate, mean_answer_words, mean_reference_cost_usd, mean_steps, mean_latency_ms, passes_per_reference_dollar}]` |
+| `GET /api/leaderboard/agreement?category=`   |                                                                                        | `{decisive_votes, agreement_rate, ci, table, left_pick_rate}`. Code and agent tasks only                                                                                                         |
+| `GET /api/leaderboard/length-bias?category=` |                                                                                        | `{votes, longer_pick_rate, ci, by_category}`. Open-ended tasks only                                                                                                                              |
 
 Run ids are returned only after the voter has voted.
 
@@ -333,21 +340,56 @@ The web server starts two runs through the Python API and proxies their SSE stre
 
 ### 7.1 Task bank
 
-30 tasks: 8 math word problems, 8 data analysis (bundled CSVs, needs `python_exec`), 8 multi-hop questions (doc corpus, needs `search_docs`), 6 tool-selection traps. Each task is one YAML file under `tasks/<category>/`, and ships with a known-correct and a known-wrong answer; a test asserts the scorer passes one and fails the other.
+Revised 2026-10-02 at the owner's request. 30 tasks, six categories of five. Each task is one YAML file under `tasks/<category>/`.
 
-Fixtures and corpus documents are kept small so tool output fits the token budget in Section 2.4.
+| Category      | What the agent produces                                                                                    | Scored by                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `writing`     | A cold email, a rewrite of a messy paragraph, a product description, a story opening, a refusal            | Constraint checks                                    |
+| `diagram`     | Mermaid code only: flowcharts, a system architecture, a sequence diagram, a state diagram                  | Constraint checks, including the real Mermaid parser |
+| `explanation` | A concept explained for a named audience, with examples                                                    | Constraint checks                                    |
+| `tech_stack`  | A stack for a project with stated constraints, plus three to five lines of reasoning                       | Constraint checks                                    |
+| `code`        | A fixed or newly written Python function, submitted as text                                                | Hidden tests in the sandbox: pass or fail            |
+| `agent`       | A number, from the five hardest tasks of the first bank (two data analysis, one multi-hop, two tool traps) | Deterministic: pass or fail                          |
+
+- **Two kinds of task.** `code` and `agent` have a right answer and are scored pass or fail. The other four are open-ended: there is no right answer, and **quality is decided by votes, not by a scorer**.
+- **Length limits.** Every open-ended prompt states an explicit limit (words, lines, or sentences), so a config cannot win by writing more. The limit is one of the constraint checks.
+- **Examples.** Every task ships with answers the scorer must accept and answers it must reject, and a test asserts both. For `agent` tasks a test also re-derives the expected value from the fixtures or the corpus. For `code` tasks a reference implementation in the tests must pass every hidden case.
+- **Synthetic data only.** Fixtures and corpus documents are small so tool output fits the token budget in Section 2.4.
 
 ### 7.2 Scorers
 
-| Scorer              | Behaviour                                                                                      |
-| ------------------- | ---------------------------------------------------------------------------------------------- |
-| `exact`             | Compare after normalisation (trim, case-fold, collapse whitespace, strip trailing punctuation) |
-| `numeric_tolerance` | Extract the number, compare with absolute or relative tolerance                                |
-| `regex`             | Match the normalised answer against a pattern                                                  |
-| `python_check`      | Run a checker function from `tasks/checkers/` in the sandbox                                   |
-| `llm_judge`         | Rubric plus structured verdict; reasoning logged in `score_computed.explanation`               |
+| Scorer              | Behaviour                                                                                                                                                                                                        | Result                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `exact`             | Compare after normalisation (trim, case-fold, collapse whitespace, strip trailing punctuation)                                                                                                                   | Pass or fail                           |
+| `numeric_tolerance` | Extract the number, compare with absolute or relative tolerance                                                                                                                                                  | Pass or fail                           |
+| `regex`             | Match the normalised answer against a pattern                                                                                                                                                                    | Pass or fail                           |
+| `python_check`      | Run a checker function from `tasks/checkers/` in the sandbox. For `code` tasks the checker loads the submitted function and runs the hidden cases; code that crashes, hangs, or does not load is a failed answer | Pass or fail                           |
+| `constraints`       | Run the task's list of checks and report how many were met                                                                                                                                                       | "Constraints met X/Y". No pass or fail |
+| `llm_judge`         | Rubric plus structured verdict; reasoning logged in `score_computed.explanation`                                                                                                                                 | Not used                               |
 
-**The recorded bank has no `llm_judge` tasks.** All 30 use deterministic scorers. `llm_judge` is implemented and tested with the scripted fake client. If it is ever used, the judge's `model_family` must differ from every contestant's, to avoid self-preference bias, and the judge must also be a free model.
+In the bank: 20 `constraints`, 6 `python_check`, 4 `numeric_tolerance`.
+
+**Constraint checks.** Each open-ended task lists its checks in `scorer_config.checks`. The available kinds:
+
+| Check                                     | Passes when                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `max_words`, `max_lines`, `sentences`     | The answer is within the stated length                                                   |
+| `section`, `starts_with`, `section_lines` | A required labelled line is present, or has the required number of lines under it        |
+| `mentions`                                | A constraint the task stated is named in the answer (any of, or all of, a list of terms) |
+| `excludes`                                | A forbidden term is absent                                                               |
+| `pattern`                                 | A regular expression matches                                                             |
+| `mermaid`                                 | The answer is the requested diagram type and the Mermaid parser accepts it               |
+
+**What a constraint score means, and what it does not.**
+
+- It says the answer respected the limits the task stated. It says nothing about whether the answer is good, correct, or true. A tech-stack answer that names the budget and recommends something unworkable meets its constraints.
+- It is shown as "constraints met X/Y", never as pass or fail, and `passed` is null on these runs.
+- `mentions` is substring matching. It can be satisfied by naming a constraint without honouring it, and it can miss a paraphrase. It is a floor, not a judgement.
+- **"Parses and renders" is checked as "parses".** The scorer runs Mermaid's own parser (the version the site ships) under Node in the sandbox. It does not draw the diagram: drawing needs a browser's layout engine. A diagram that parses can still be drawn badly, and that is left to the voters. The browser draws it with the same Mermaid version, and shows the source with an error note if drawing fails.
+
+**No LLM judge.** `llm_judge` stays implemented and tested with the scripted fake client, and no task uses it. If it is ever used, the judge's `model_family` must differ from every contestant's and the judge must be a free model.
+
+**Answer length.** The word count of every final answer is recorded with the run. Counting lives in one place (`arena/constraints.py`); the web app reads the stored number and never recounts.
 
 ### 7.3 Free providers (checked 2026-10-02, official pages only)
 
@@ -379,7 +421,7 @@ Because free-tier inputs may be reviewed or used for training, tasks contain onl
 | `qwen-two-tools`     | `groq/qwen/qwen3.8-27b`   | Full agent prompt                | `calculator`, `read_file` |
 
 - **Prompt pair:** `gemini-full` and `gemini-bare-prompt` differ only in the system prompt.
-- **Tools pair:** `qwen-full` and `qwen-two-tools` differ only in enabled tools.
+- **Tools pair:** `qwen-full` and `qwen-two-tools` differ only in enabled tools. With the revised bank the difference can only matter on the five `agent` tasks, and on `code` tasks if the agent tests its code before submitting. On the twenty open-ended tasks the two configs are close to identical; votes there measure noise between them, and the leaderboard's category filter keeps that visible.
 - **Model pair:** `gemini-full` and `qwen-full` differ only in the model, a third controlled comparison.
 - **Two model families:** Gemini (Google) and Qwen (Alibaba), served by Groq.
 - **Why not gpt-oss-120b:** it was the first choice for Groq, but it calls its built-in `python` tool instead of `python_exec` and cannot run code in the arena. See `FINDINGS.md`.
@@ -402,21 +444,37 @@ Reference prices for the "at paid rates" column, per million tokens:
 
 ### 7.6 Objective leaderboard
 
-Computed over the recorded set, where every config has exactly one run per task. Columns: pass rate with a Wilson interval, mean cost per task at paid rates (actual cost shown as $0), mean steps, mean latency (active time), and passes per dollar at paid rates.
+Computed over the recorded set, where every config has exactly one run per task. Filterable by category, like the preference board.
+
+- **Pass rate** with a Wilson interval, over `code` and `agent` tasks only: ten runs per config. The interval is wide and is shown.
+- **Constraints met**, over the four open-ended categories: the share of checks met across twenty runs per config. Labelled as constraint compliance, not quality.
+- Mean answer length in words, mean cost per task at paid rates (actual cost shown as $0), mean steps, mean latency (active time), and passes per dollar at paid rates.
 
 ### 7.7 Agreement
 
+**Computed over `code` and `agent` tasks only.** Open-ended tasks have no pass or fail to agree with.
+
 - **Headline:** over votes on matches where exactly one side passed, the share that picked the passing side. `tie` and `both_bad` count as disagreement there.
 - **Full table:** every vote is stored with both sides' pass/fail, so the page and the README can also show how people vote when both passed or both failed.
-- **Position bias:** the share of non-tie votes that picked the left pane.
+- **Position bias:** the share of non-tie votes that picked the left pane, over all categories.
 
-The stat is only meaningful because voters cannot see pass/fail, score, cost, or tokens before they vote.
+The stat is only meaningful because voters cannot see pass/fail, score, cost, or tokens before they vote. With ten scored tasks per config and capable models, matches where exactly one side passed may be few; the page shows the count beside the rate.
 
-### 7.8 Methodology notes for `/about`
+### 7.8 Length bias
+
+On open-ended tasks, do voters prefer the longer answer?
+
+- Every vote stores both answers' word counts.
+- Over `left` or `right` votes on open-ended matches where the two answers differ in length, the share that picked the longer answer, with a Wilson interval, overall and per category. `tie` and `both_bad` votes and equal-length pairs are left out and their count is shown.
+- 50% means no bias. The stated length limits bound how far two answers can differ, so this measures bias inside the limit, not a preference for unbounded length.
+
+### 7.9 Methodology notes for `/about`
 
 - **What voters see.** Before voting: both traces and final answers, step count, elapsed time. After voting: pass/fail, score, cost, tokens, and which config was on which side. The server withholds the rest.
 - **What is still not blind.** Elapsed time and trace style can hint at the model. The recordings are in a public repository, so a determined visitor can look a run up. Position bias is reported.
-- **Scoring.** Every recorded task uses a deterministic scorer. An LLM judge exists in the codebase but is not used; if it ever is, it must come from a different model family than every contestant.
+- **Scoring.** Code and agent tasks are scored pass or fail by hidden tests or a deterministic check. Writing, diagram, explanation, and tech-stack tasks have no right answer: they get automatic constraint checks only (length limit, required sections, stated constraints mentioned, the diagram parses), shown as "constraints met X/Y". That number is not a measure of quality; quality on those tasks is decided by votes. No LLM judge is used.
+- **Agreement and length bias.** Agreement between votes and the scorer uses code and agent tasks only. On open-ended tasks the site reports how often the longer answer won.
+- **Diagrams.** The scorer checks that a diagram parses, not how it looks.
 - **Cost.** Every run used a free tier and cost $0. The "at paid rates" figures apply the providers' published list prices to the measured token counts, with sources and the date checked.
 - **Latency.** Measured on free tiers, which can be slower than paid ones. Waiting for rate limits is excluded.
 - **Elo.** K=32, start 1000, replayed in vote order; intervals from a seeded bootstrap.
@@ -470,42 +528,46 @@ Railway and Fly.io are dropped.
 
 Every phase ends with: files changed, tests run, a commit, a push to GitHub, a report (what was done, exact verification commands, decisions, open questions), then a stop.
 
-| Phase                                | Deliverable                                                                                                                                          | Acceptance                                                                                                                                                                                                                  |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Planning                           | Plan, `CLAUDE.md`, `DECISIONS.md`                                                                                                                    | Done                                                                                                                                                                                                                        |
-| 1 Scaffold                           | Monorepo, web + api + sandbox, compose, lint/typecheck, health endpoint, schema generation                                                           | Done                                                                                                                                                                                                                        |
-| 2 Runner + tracing (LiteLLM backend) | LangGraph loop, four tools, sandbox execution, event emitter, pricing table with free flags and reference prices, free-only guard, `arena run` CLI   | Unit tests per tool, including sandbox escape attempts and timeouts; every emitted event validates against the schema; a test per limit proving the right `stop_reason`; a test that a non-free or unknown model is refused |
-| 3 Tasks + scorers                    | 30 YAML tasks, fixtures, corpus, all scorers, `arena eval` CLI                                                                                       | Per task, a test that a known-correct answer passes and a known-wrong one fails                                                                                                                                             |
-| 4 Stores + API + streaming           | Python run store and run API with SSE; `arena export`; Postgres schema; web route handlers for matches, blind view, and votes                        | Python integration test: start two runs, consume the streams, gap-free `seq`, stored score, resume from a cursor. Web test: no redacted field and no `score_computed` event reaches a voter who has not voted               |
-| 5 Arena UI                           | `/arena` pickers, split-pane traces, counter strip (steps and elapsed time before the vote), list view, plain vote buttons, scorecard after the vote | A full live match runs in the browser locally; component tests for the trace card and scorecard                                                                                                                             |
-| 6 Voting + reveal                    | Reveal animation, vote validation, double-vote handling, DB-backed rate limits                                                                       | Tests for vote validation, double-vote rejection, and rate-limit persistence across a restart                                                                                                                               |
-| 7 Leaderboards                       | Elo, bootstrap intervals, objective table, agreement, category filters                                                                               | Elo matches hand-computed examples; bootstrap is deterministic under a fixed seed; page renders with seeded data                                                                                                            |
-| 8 Replay + recording safety          | Client-paced replay, recorder with throttle, backoff, and resume, pilot gate, scrubbed export                                                        | With the Python API unreachable, a visitor completes a replay match and votes, and a test asserts no request is made to it; limiter and resume tests; a test that fails on a key-like pattern in `data/recordings/`         |
-| 9 Polish                             | Theme, graph view, permalinks, `/about`, empty/loading/error states, mobile layout, Open Graph images                                                | Lighthouse ≥ 90 for performance and accessibility; Playwright end-to-end test passes                                                                                                                                        |
-| 10 Results + launch                  | Pilot, then full recording after approval; README with measured results; deploy to Vercel Hobby and Neon Free                                        | The deployed site works end to end in replay mode, with $0 spent                                                                                                                                                            |
+| Phase                                | Deliverable                                                                                                                                                                                                                                 | Acceptance                                                                                                                                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Planning                           | Plan, `CLAUDE.md`, `DECISIONS.md`                                                                                                                                                                                                           | Done                                                                                                                                                                                                                        |
+| 1 Scaffold                           | Monorepo, web + api + sandbox, compose, lint/typecheck, health endpoint, schema generation                                                                                                                                                  | Done                                                                                                                                                                                                                        |
+| 2 Runner + tracing (LiteLLM backend) | LangGraph loop, four tools, sandbox execution, event emitter, pricing table with free flags and reference prices, free-only guard, `arena run` CLI                                                                                          | Unit tests per tool, including sandbox escape attempts and timeouts; every emitted event validates against the schema; a test per limit proving the right `stop_reason`; a test that a non-free or unknown model is refused |
+| 3 Tasks + scorers                    | 30 YAML tasks in six categories, fixtures, corpus, all scorers including constraint checks and hidden code tests, Mermaid parsing in the sandbox, `arena eval` CLI                                                                          | Per task, a test that known-good answers are accepted and known-bad ones rejected; a reference implementation passes every hidden code test                                                                                 |
+| 4 Stores + API + streaming           | Python run store and run API with SSE; `arena export`; Postgres schema; web route handlers for matches, blind view, and votes                                                                                                               | Python integration test: start two runs, consume the streams, gap-free `seq`, stored score, resume from a cursor. Web test: no redacted field and no `score_computed` event reaches a voter who has not voted               |
+| 5 Arena UI                           | `/arena` pickers, split-pane traces, counter strip (steps and elapsed time before the vote), list view, plain vote buttons, scorecard after the vote. Final answers render as sanitised markdown, with Mermaid diagrams drawn in both panes | A full live match runs in the browser locally; component tests for the trace card and scorecard                                                                                                                             |
+| 6 Voting + reveal                    | Reveal animation, vote validation, double-vote handling, DB-backed rate limits                                                                                                                                                              | Tests for vote validation, double-vote rejection, and rate-limit persistence across a restart                                                                                                                               |
+| 7 Leaderboards                       | Elo, bootstrap intervals, objective table (pass rate and constraints met), agreement on code and agent tasks, length bias on open-ended tasks, category filters on every board                                                              | Elo matches hand-computed examples; bootstrap is deterministic under a fixed seed; page renders with seeded data                                                                                                            |
+| 8 Replay + recording safety          | Client-paced replay, recorder with throttle, backoff, and resume, pilot gate, scrubbed export                                                                                                                                               | With the Python API unreachable, a visitor completes a replay match and votes, and a test asserts no request is made to it; limiter and resume tests; a test that fails on a key-like pattern in `data/recordings/`         |
+| 9 Polish                             | Theme, graph view, permalinks, `/about`, empty/loading/error states, mobile layout, Open Graph images                                                                                                                                       | Lighthouse ≥ 90 for performance and accessibility; Playwright end-to-end test passes                                                                                                                                        |
+| 10 Results + launch                  | Pilot, then full recording after approval; README with measured results; deploy to Vercel Hobby and Neon Free                                                                                                                               | The deployed site works end to end in replay mode, with $0 spent                                                                                                                                                            |
 
 ## 11. Risks
 
-| Risk                                                                          | Handling                                                                                                                                                                                                         |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A "free" model gets billed because the account or project has billing enabled | The guard cannot see account state. Setup instructions require a Gemini key from a project without billing and a Groq account on the free plan; the pilot report asks the owner to confirm $0 on both dashboards |
-| Free tiers change or disappear                                                | Limits and prices carry a source URL and date; recordings are committed, so the public site keeps working with no provider at all                                                                                |
-| Groq's 8,000 tokens/minute cap rejects a large request                        | Tool output and per-run tokens are capped for every config; the pilot measures real token use before the full recording                                                                                          |
-| Gemini's free limits are unknown until the owner reads the dashboard          | The recorder takes them from the pricing table; recording does not start with blank limits                                                                                                                       |
-| Rate limiting distorts results                                                | Throttle waits are excluded from latency and timeouts; interrupted runs are re-run, never recorded as failures                                                                                                   |
-| Recording takes days                                                          | Resumable by design; the pilot projects the duration                                                                                                                                                             |
-| Smaller free models fail most tasks, or pass all of them                      | The pilot reports pass rate per task; tasks are adjusted so the configs are separated before the full recording                                                                                                  |
-| Free-tier inputs may be used for training or human review                     | Tasks use synthetic data only                                                                                                                                                                                    |
-| Blind voting leaks the result or the identity of a side                       | Server-side redaction with a test. Elapsed time and trace style can still hint; `/about` says so                                                                                                                 |
-| A secret ends up in committed recordings                                      | Exporter scrubs and refuses key-like content; a test scans the folder; history is scanned before pushes                                                                                                          |
-| Sandbox escape                                                                | Layered isolation, no secrets in the sandbox, escape attempts in the test suite                                                                                                                                  |
-| Neon compute sleeps after 5 minutes                                           | The first vote after idle is slower by a cold start; the UI shows a pending state                                                                                                                                |
-| Vercel Hobby limits                                                           | Replay needs no long-lived functions; leaderboards are cached. Exceeding a limit pauses the feature, it does not bill                                                                                            |
-| One run per config per task is a small sample                                 | Wilson intervals on pass rates; stated on `/about` and in the README                                                                                                                                             |
-| Elo instability with few votes                                                | Bootstrap intervals next to every rating; configs under a minimum vote count are marked provisional                                                                                                              |
-| Vote manipulation                                                             | Per-IP limits and one vote per match per voter id; acknowledged as not robust against a determined actor                                                                                                         |
-| Provider quirks through LiteLLM (reasoning fields that must be returned)      | Verbatim message store; a contract test per provider with the scripted fake; the pilot exercises the real thing                                                                                                  |
-| Lighthouse score with React Flow and Recharts                                 | Both are loaded lazily                                                                                                                                                                                           |
+| Risk                                                                                 | Handling                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A "free" model gets billed because the account or project has billing enabled        | The guard cannot see account state. Setup instructions require a Gemini key from a project without billing and a Groq account on the free plan; the pilot report asks the owner to confirm $0 on both dashboards |
+| Free tiers change or disappear                                                       | Limits and prices carry a source URL and date; recordings are committed, so the public site keeps working with no provider at all                                                                                |
+| Groq's 8,000 tokens/minute cap rejects a large request                               | Tool output and per-run tokens are capped for every config; the pilot measures real token use before the full recording                                                                                          |
+| Gemini's free limits are unknown until the owner reads the dashboard                 | The recorder takes them from the pricing table; recording does not start with blank limits                                                                                                                       |
+| Rate limiting distorts results                                                       | Throttle waits are excluded from latency and timeouts; interrupted runs are re-run, never recorded as failures                                                                                                   |
+| Recording takes days                                                                 | Resumable by design; the pilot projects the duration                                                                                                                                                             |
+| Smaller free models fail most tasks, or pass all of them                             | The pilot reports pass rate per task; tasks are adjusted so the configs are separated before the full recording                                                                                                  |
+| Free-tier inputs may be used for training or human review                            | Tasks use synthetic data only                                                                                                                                                                                    |
+| Blind voting leaks the result or the identity of a side                              | Server-side redaction with a test. Elapsed time and trace style can still hint; `/about` says so                                                                                                                 |
+| A secret ends up in committed recordings                                             | Exporter scrubs and refuses key-like content; a test scans the folder; history is scanned before pushes                                                                                                          |
+| Sandbox escape                                                                       | Layered isolation, no secrets in the sandbox, escape attempts in the test suite                                                                                                                                  |
+| Neon compute sleeps after 5 minutes                                                  | The first vote after idle is slower by a cold start; the UI shows a pending state                                                                                                                                |
+| Vercel Hobby limits                                                                  | Replay needs no long-lived functions; leaderboards are cached. Exceeding a limit pauses the feature, it does not bill                                                                                            |
+| One run per config per task is a small sample                                        | Wilson intervals on pass rates; stated on `/about` and in the README                                                                                                                                             |
+| Elo instability with few votes                                                       | Bootstrap intervals next to every rating; configs under a minimum vote count are marked provisional                                                                                                              |
+| Vote manipulation                                                                    | Per-IP limits and one vote per match per voter id; acknowledged as not robust against a determined actor                                                                                                         |
+| Provider quirks through LiteLLM (reasoning fields that must be returned)             | Verbatim message store; a contract test per provider with the scripted fake; the pilot exercises the real thing                                                                                                  |
+| Lighthouse score with React Flow, Recharts, and Mermaid                              | All three are loaded lazily                                                                                                                                                                                      |
+| Constraint checks are read as a quality score                                        | Shown as "constraints met X/Y", never as pass or fail; `/about` says what they do not measure                                                                                                                    |
+| Model output rendered as markdown or as a diagram runs script in a visitor's browser | Markdown is rendered without raw HTML; Mermaid runs at its strict security level; a test feeds both a script payload                                                                                             |
+| Pass rate rests on ten tasks per config                                              | Wilson intervals shown; the README reports the interval, not just the rate                                                                                                                                       |
+| A diagram parses but cannot be drawn in the browser                                  | The pane shows the source and an error note; voters judge what they see                                                                                                                                          |
 
 ## 12. Deviations from the brief
 
@@ -537,6 +599,14 @@ Consequences of item 17, also approved:
 21. Two stores: SQLite for the local run store, Postgres for votes and counters (Docker locally, Neon in public). The brief's "SQLite in development, Postgres in production, same models" no longer applies as written.
 22. The admin token and bring-your-own-key flow are dropped.
 23. Run latency is active time, excluding rate-limit waits.
+
+Task bank revision, requested by the owner on 2026-10-02:
+
+24. The bank is six categories of five: writing, diagrams, explanation, tech-stack recommendation, code, and agent tasks. The brief's four categories are replaced; the five hardest tasks of the first bank survive as the agent category.
+25. Twenty of the thirty tasks have no pass or fail. They get constraint checks, reported as "constraints met X/Y", and their quality is decided by votes. `score_computed.passed` is nullable and the event carries the list of checks.
+26. The agreement stat covers code and agent tasks only. A length-bias stat is added for open-ended tasks.
+27. The sandbox image gains Node 22, `mermaid` 12.0.0, and `jsdom` 30.1.1 to parse diagrams. The web app will need `mermaid` and a markdown renderer in Phase 5. Neither is in the brief's stack list.
+28. "Mermaid parses and renders" is checked as "parses"; drawing happens only in the browser.
 
 ## 13. Resolved questions
 

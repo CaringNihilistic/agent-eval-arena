@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from sandbox import __version__
-from sandbox.executor import ExecLimits, execute
+from sandbox.executor import ExecLimits, execute, parse_mermaid
 
 MAX_CODE_CHARS = 20_000
 MAX_TIMEOUT_S = 10.0
@@ -53,3 +53,19 @@ async def run_code(request: ExecRequest) -> ExecResponse:
         truncated=result.truncated,
         duration_ms=result.duration_ms,
     )
+
+
+class MermaidRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=MAX_CODE_CHARS)
+
+
+class MermaidResponse(BaseModel):
+    valid: bool
+    error: str | None
+
+
+@app.post("/mermaid/parse")
+async def check_mermaid(request: MermaidRequest) -> MermaidResponse:
+    """Says whether the text parses as a Mermaid diagram. Nothing is rendered."""
+    verdict = await parse_mermaid(request.code)
+    return MermaidResponse(valid=verdict.valid, error=verdict.error)

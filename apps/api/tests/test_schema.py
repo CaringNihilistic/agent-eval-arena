@@ -92,6 +92,7 @@ VALID_PAYLOADS: dict[str, dict[str, Any]] = {
         "score": 1.0,
         "scorer_type": "exact",
         "explanation": "Matches the expected answer.",
+        "checks": [],
     },
     "error": {"message": "tool timed out", "recoverable": True, "step": 1},
 }
@@ -166,6 +167,20 @@ def test_models_round_trip_to_schema_valid_json(
     assert dumped["type"] == event_type
 
 
+def test_constraint_score_has_no_pass_or_fail(validator: Draft202012Validator) -> None:
+    candidate = event(
+        "score_computed",
+        passed=None,
+        score=0.75,
+        scorer_type="constraints",
+        explanation="Constraints met 3/4.",
+        checks=[{"name": "at most 120 words", "passed": False, "detail": "131 words."}],
+    )
+
+    assert accepted_by_schema(validator, candidate), list(validator.iter_errors(candidate))
+    assert accepted_by_models(candidate)
+
+
 @pytest.mark.parametrize("event_type", sorted(BLIND_OVERRIDES))
 def test_blind_view_event_is_still_valid(validator: Draft202012Validator, event_type: str) -> None:
     candidate = {**event(event_type, **BLIND_OVERRIDES[event_type]), "redacted": True}
@@ -185,6 +200,12 @@ INVALID_EVENTS: dict[str, dict[str, Any]] = {
     "unknown stop reason": event("run_finished", stop_reason="bored"),
     "unknown scorer": event("score_computed", scorer_type="vibes"),
     "score above one": event("score_computed", score=1.5),
+    "score without checks": {
+        **ENVELOPE,
+        "type": "score_computed",
+        "payload": {"passed": True, "score": 1.0, "scorer_type": "exact", "explanation": "x"},
+    },
+    "check without a verdict": event("score_computed", checks=[{"name": "n", "detail": "d"}]),
     "unknown enabled tool": event(
         "run_started", config={**CONFIG, "enabled_tools": ["web_search"]}
     ),

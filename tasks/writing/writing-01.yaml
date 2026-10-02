@@ -1,0 +1,25 @@
+id: writing-01
+title: "Cold email to a clinic"
+category: writing
+difficulty: medium
+prompt: |
+  Write a cold email from Priya Nair, who sells a booking app called Slotwise, to the owner of a small physiotherapy clinic. The clinic takes bookings by phone and loses appointments to no-shows.
+  Limits: at most 110 words in total. The first line must start with 'Subject:'. Name the product. Mention no-shows. End by proposing a 15-minute call. Do not use the phrase 'I hope this email finds you well'.
+  Answer with the email only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 110}
+    - {"type": "starts_with", "label": "Subject:"}
+    - {"type": "mentions", "name": "names the product", "any_of": ["Slotwise"]}
+    - {"type": "mentions", "name": "mentions no-shows", "any_of": ["no-show", "no show"]}
+    - {"type": "mentions", "name": "proposes a 15-minute call", "any_of": ["15-minute", "15 minute", "fifteen-minute", "fifteen minute"]}
+    - {"type": "excludes", "name": "avoids the banned phrase", "terms": ["I hope this email finds you well"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Subject: Fewer no-shows at your clinic\n\nHi Dr Hale,\n\nPhone bookings are easy to forget, and every no-show is an empty slot you cannot refill. Slotwise lets patients book online and sends them a reminder the day before, so fewer appointments are missed and your front desk spends less time on the phone.\n\nClinics like yours usually set it up in an afternoon.\n\nWould you be open to a 15-minute call this week so I can show you how it works?\n\nBest,\nPriya Nair"
+  wrong:
+    - "Hi Dr Hale,\n\nI hope this email finds you well. Slotwise is a booking app. Can we talk?\n\nPriya"
+    - "Subject: Booking app\n\nHello, our app is great and you should buy it today. Call me any time for a long chat.\n\nPriya"

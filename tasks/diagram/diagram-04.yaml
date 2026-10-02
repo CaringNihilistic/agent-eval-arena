@@ -1,0 +1,21 @@
+id: diagram-04
+title: "State diagram of a support ticket"
+category: diagram
+difficulty: hard
+prompt: |
+  Draw a Mermaid state diagram of a support ticket. A ticket starts as Open. An agent picks it up and it becomes In Progress. From In Progress it can go to Waiting on Customer and back to In Progress when the customer replies, or to Resolved. A Resolved ticket becomes Closed after seven days, or goes back to Open if the customer reopens it.
+  Limits: at most 18 lines. Use stateDiagram-v2. Answer with the Mermaid code only, with no explanation.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "mermaid", "diagram": "stateDiagram"}
+    - {"type": "max_lines", "value": 18}
+    - {"type": "mentions", "name": "shows the five states", "all_of": ["Open", "Progress", "Waiting", "Resolved", "Closed"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "stateDiagram-v2\n  [*] --> Open\n  Open --> InProgress: agent picks up\n  InProgress --> WaitingOnCustomer: needs reply\n  WaitingOnCustomer --> InProgress: customer replies\n  InProgress --> Resolved: fixed\n  Resolved --> Closed: seven days\n  Resolved --> Open: reopened\n  Closed --> [*]"
+  wrong:
+    - "stateDiagram-v2\n  [*] --> Open\n  Open --> Closed"
+    - "The ticket goes from Open to In Progress to Waiting to Resolved to Closed."

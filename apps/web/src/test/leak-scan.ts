@@ -16,6 +16,7 @@ export const WITHHELD_KEYS = [
   "score",
   "scorer_type",
   "explanation",
+  "checks",
 ] as const;
 
 export interface Leak {

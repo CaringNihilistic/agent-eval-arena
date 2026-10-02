@@ -9,8 +9,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from arena.pricing import Backend
 
 ToolName = Literal["calculator", "python_exec", "search_docs", "read_file"]
-Category = Literal["math", "data_analysis", "multi_hop", "tool_trap"]
-ScorerType = Literal["exact", "numeric_tolerance", "regex", "python_check", "llm_judge"]
+Category = Literal["writing", "diagram", "explanation", "tech_stack", "code", "agent"]
+# Categories with a right answer. The rest are open-ended: scored by constraint
+# checks only, and judged on quality by votes.
+AUTO_SCORED_CATEGORIES = frozenset({"code", "agent"})
+ScorerType = Literal[
+    "exact", "numeric_tolerance", "regex", "python_check", "llm_judge", "constraints"
+]
 
 # Folders under tasks/ that hold data for tasks, not task definitions.
 NON_TASK_DIRS = {"fixtures", "corpus", "checkers", "tools"}
@@ -79,6 +84,11 @@ class Task(BaseModel):
     # False for development tasks, which are not part of the recorded bank.
     # Set from the file's folder, never from the YAML.
     in_bank: bool = True
+
+    @property
+    def open_ended(self) -> bool:
+        """True when there is no right answer, only stated limits to respect."""
+        return self.category not in AUTO_SCORED_CATEGORIES
 
     def public(self) -> dict[str, Any]:
         """What may be shown to anyone. Never the expected answer or the examples."""

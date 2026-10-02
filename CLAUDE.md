@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current phase: 3 (task bank and scorers) complete. Next: the five-run Claude usage pilot, then Phase 4. An open decision on replacing the Gemini pair with gpt-oss-20b is with the owner.** Update this line at the end of every phase.
+**Current phase: 3 complete with the revised six-category task bank (Checkpoint A, four-run Claude pilot done). Next: Phase 4. With the owner: approval of the sandbox's Mermaid dependencies, the web markdown and Mermaid dependencies for Phase 5, and replacing the Gemini pair with gpt-oss-20b.** Update this line at the end of every phase.
 
 ## How we work
 

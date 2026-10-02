@@ -1,0 +1,29 @@
+id: stack-05
+title: "Shop platform migration"
+category: tech_stack
+difficulty: hard
+prompt: |
+  Recommend a technology stack for this project.
+
+  An online shop with 2 million monthly visitors, and ten times that traffic on sale days, wants to replace its old platform. Eight engineers have 9 months. The infrastructure budget is $15,000 a month.
+
+  Limits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.
+  Answer with the recommendation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 150}
+    - {"type": "section", "label": "Stack:"}
+    - {"type": "section_lines", "label": "Reasoning:", "min": 3, "max": 5, "until": ["Stack:"]}
+    - {"type": "mentions", "name": "refers to the budget", "any_of": ["$15,000", "15,000", "budget"]}
+    - {"type": "mentions", "name": "refers to the team", "any_of": ["eight engineers", "8 engineers", "team of eight"]}
+    - {"type": "mentions", "name": "refers to the deadline", "any_of": ["9 months", "nine months", "deadline"]}
+    - {"type": "mentions", "name": "refers to the scale", "any_of": ["2 million", "ten times", "10x", "peak"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Stack: Next.js storefront, Shopify Plus back end, Algolia search, Cloudflare CDN, Postgres for custom data\nReasoning:\nA hosted commerce back end absorbs sale days at ten times the usual 2 million visitors without the team running servers.\nEight engineers can focus on the storefront and integrations instead of checkout and payments.\nMigrating in stages behind the CDN fits a 9 months deadline.\nPlatform fees plus search and CDN stay within the $15,000 budget."
+  wrong:
+    - "Stack: PHP\nReasoning:\nOld but works."
+    - "Stack: Next.js, Shopify\nReasoning:\n1\n2\n3\n4\n5\n6\n7"

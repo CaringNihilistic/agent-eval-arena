@@ -1,0 +1,29 @@
+id: stack-03
+title: "Internal leave tracker"
+category: tech_stack
+difficulty: easy
+prompt: |
+  Recommend a technology stack for this project.
+
+  A 20-person company wants an internal tool to request and approve leave. One developer has 2 weeks. There is no budget, so everything must run on free tiers.
+
+  Limits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.
+  Answer with the recommendation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 150}
+    - {"type": "section", "label": "Stack:"}
+    - {"type": "section_lines", "label": "Reasoning:", "min": 3, "max": 5, "until": ["Stack:"]}
+    - {"type": "mentions", "name": "refers to the budget", "any_of": ["free tier", "no budget", "free"]}
+    - {"type": "mentions", "name": "refers to the team", "any_of": ["one developer", "solo", "single developer"]}
+    - {"type": "mentions", "name": "refers to the deadline", "any_of": ["2 weeks", "two weeks", "deadline"]}
+    - {"type": "mentions", "name": "refers to the scale", "any_of": ["20"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Stack: SvelteKit, SQLite, Lucia auth, hosted on a free Fly.io machine\nReasoning:\nA single small framework is all one developer can maintain.\nSQLite needs no setup, which saves days against a 2 weeks deadline.\nEvery piece runs on a free tier, as there is no budget.\n20 users will never strain one small machine."
+  wrong:
+    - "Stack: SvelteKit\nReasoning:\nOne reason only."
+    - "Build it with a large team over a year on AWS."

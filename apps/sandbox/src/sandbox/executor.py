@@ -7,6 +7,7 @@ and process-count limits (see docker-compose.yml).
 
 import asyncio
 import contextlib
+import json
 import os
 import resource
 import shutil
@@ -213,3 +214,48 @@ async def _run(code: str, limits: ExecLimits, workdir: Path, fixtures_dir: Path)
         truncated=stdout.truncated or stderr.truncated,
         duration_ms=int((time.monotonic() - started) * 1000),
     )
+
+
+MERMAID_DIR = Path("/opt/mermaid")
+MERMAID_TIMEOUT_S = 20.0
+
+
+@dataclass(frozen=True)
+class MermaidVerdict:
+    valid: bool
+    error: str | None
+
+
+async def parse_mermaid(code: str) -> MermaidVerdict:
+    """Run the real Mermaid parser on diagram text.
+
+    The text is data for the parser, not a program, so the memory limit used for
+    executed code is not applied here: Node needs a large address space to start.
+    The timeout, the minimal environment, and the container's own limits still hold.
+    """
+    async with _exec_lock:
+        started = await asyncio.create_subprocess_exec(
+            "node",
+            "check.mjs",
+            cwd=MERMAID_DIR,
+            env={"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"), "HOME": "/tmp"},
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
+        )
+        try:
+            stdout, _stderr = await asyncio.wait_for(
+                started.communicate(code.encode("utf-8")), timeout=MERMAID_TIMEOUT_S
+            )
+        except TimeoutError:
+            _kill_group(started.pid)
+            await started.wait()
+            return MermaidVerdict(False, "The parser did not finish in time.")
+        finally:
+            _reap_strays()
+    try:
+        verdict = json.loads(stdout.decode("utf-8"))
+        return MermaidVerdict(bool(verdict["valid"]), verdict.get("error"))
+    except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+        return MermaidVerdict(False, "The parser gave no verdict.")

@@ -1,0 +1,22 @@
+id: diagram-03
+title: "Sequence diagram of a one-time-code login"
+category: diagram
+difficulty: medium
+prompt: |
+  Draw a Mermaid sequence diagram of this login. The User enters a phone number in the App. The App asks the Auth Service to send a code. The Auth Service sends the code through the SMS Gateway, which delivers it to the User. The User types the code into the App, the App sends it to the Auth Service, and the Auth Service returns a session token.
+  Limits: at most 18 lines. Use these four participants: User, App, Auth Service, SMS Gateway. Answer with the Mermaid code only, with no explanation.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "mermaid", "diagram": "sequenceDiagram"}
+    - {"type": "max_lines", "value": 18}
+    - {"type": "mentions", "name": "uses the four participants", "all_of": ["User", "App", "Auth Service", "SMS Gateway"]}
+    - {"type": "mentions", "name": "shows the token being returned", "any_of": ["token"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "sequenceDiagram\n  participant U as User\n  participant A as App\n  participant S as Auth Service\n  participant G as SMS Gateway\n  U->>A: Enter phone number\n  A->>S: Request code\n  S->>G: Send code\n  G-->>U: Deliver code\n  U->>A: Type code\n  A->>S: Verify code\n  S-->>A: Session token"
+  wrong:
+    - "flowchart TD\n  User --> App --> AuthService"
+    - "sequenceDiagram\n  User->>App: Enter phone number\n  App->>User: Done"

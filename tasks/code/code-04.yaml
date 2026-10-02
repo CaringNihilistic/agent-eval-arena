@@ -1,0 +1,31 @@
+id: code-04
+title: "Merge overlapping intervals"
+category: code
+difficulty: hard
+prompt: |
+  Write a Python function merge_intervals(intervals). Each interval is a list of two numbers [start, end] with start <= end. Return a list of intervals, sorted by start, in which every group of overlapping or touching intervals has been merged into one. [1, 4] and [4, 5] touch and become [1, 5]. The input may be in any order and may be empty.
+  Answer with the Python function only.
+required_tools: [python_exec]
+scorer_type: python_check
+scorer_config:
+  checker: code_tests
+  # The checker runs the agent's code, so a hang or crash is the answer's failure.
+  crash_is_failure: true
+  function: merge_intervals
+  # Hidden tests. Never sent to the agent or the browser.
+  cases:
+    - {"args": [[[1, 3], [2, 6], [8, 10], [15, 18]]], "expected": [[1, 6], [8, 10], [15, 18]]}
+    - {"args": [[[1, 4], [4, 5]]], "expected": [[1, 5]]}
+    - {"args": [[]], "expected": []}
+    - {"args": [[[5, 7], [1, 2], [2, 3]]], "expected": [[1, 3], [5, 7]]}
+    - {"args": [[[1, 10], [2, 3]]], "expected": [[1, 10]]}
+    - {"args": [[[3, 4]]], "expected": [[3, 4]]}
+    - {"args": [[[1, 2], [3, 4], [5, 6]]], "expected": [[1, 2], [3, 4], [5, 6]]}
+    - {"args": [[[6, 8], [1, 9], [2, 4]]], "expected": [[1, 9]]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "def merge_intervals(intervals):\n    merged = []\n    for start, end in sorted(intervals):\n        if merged and start <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], end)\n        else:\n            merged.append([start, end])\n    return merged"
+  wrong:
+    - "def merge_intervals(intervals):\n    return sorted(intervals)"
+    - "def merge_intervals(intervals):\n    merged = []\n    for start, end in intervals:\n        if merged and start <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], end)\n        else:\n            merged.append([start, end])\n    return merged"

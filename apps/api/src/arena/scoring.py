@@ -1,7 +1,10 @@
-"""Scorers: decide whether an agent's final answer is right.
+"""Scorers.
 
-Deterministic scorers come first. `llm_judge` exists for tasks that cannot be
-checked any other way; no task in the recorded bank uses it.
+Tasks with a right answer (code and agent tasks) get a pass or a fail from a
+deterministic scorer. Open-ended tasks get constraint checks only: whether the
+answer respects the limits the task stated. Their quality is decided by votes.
+
+`llm_judge` exists for completeness; no task in the recorded bank uses it.
 """
 
 import json
@@ -14,6 +17,7 @@ from typing import Any
 import httpx
 
 from arena.config import Task
+from arena.constraints import CheckResult, ConstraintConfigError, MermaidParser, run_checks
 from arena.llm import LLMCallError, LLMClient
 from arena.pricing import PricingTable, assert_runnable, default_pricing
 from arena.settings import Settings
@@ -29,10 +33,17 @@ _QUOTES = "\"'`" + "".join(chr(code) for code in (0x201C, 0x201D, 0x2018, 0x2019
 
 @dataclass(frozen=True)
 class ScoreResult:
-    passed: bool
+    # None for open-ended tasks: there is no right answer to pass or fail.
+    passed: bool | None
     score: float
     scorer_type: str
     explanation: str
+    # Empty for tasks with a right answer.
+    checks: tuple[CheckResult, ...] = ()
+
+    @property
+    def constraints_met(self) -> int:
+        return sum(check.passed for check in self.checks)
 
 
 class ScoringError(Exception):
@@ -123,6 +134,15 @@ async def score_python_check(
         raise ScoringError(f"The sandbox returned HTTP {response.status_code}.")
     body = response.json()
     if body["timed_out"] or body["exit_code"] != 0:
+        # For code tasks the checker runs the agent's own code, so a hang or a hard
+        # crash is the answer's failure. Otherwise it is the checker's.
+        if task.scorer_config.get("crash_is_failure"):
+            reason = (
+                "The code did not finish within the time limit."
+                if body["timed_out"]
+                else "The code crashed the test run."
+            )
+            return _result(task, False, reason)
         raise ScoringError(f"The checker {name!r} failed: {str(body['stderr'])[-300:]}")
     try:
         verdict = json.loads(str(body["stdout"]).strip().splitlines()[-1])
@@ -138,6 +158,59 @@ def _checker_path(settings: Settings, name: str) -> Path:
     if not path.is_file():
         raise ScoringError(f"No checker named {name!r}.")
     return path
+
+
+async def parse_mermaid_in_sandbox(settings: Settings, code: str) -> tuple[bool, str]:
+    """Ask the sandbox to run the real Mermaid parser on untrusted diagram text."""
+    if settings.sandbox_url is None:
+        raise ScoringError("Checking a Mermaid diagram needs the sandbox, and none is configured.")
+    try:
+        async with httpx.AsyncClient(timeout=CHECK_TIMEOUT_S + 20) as client:
+            response = await client.post(
+                f"{settings.sandbox_url}/mermaid/parse", json={"code": code}
+            )
+    except httpx.HTTPError as error:
+        raise ScoringError(f"The sandbox is unreachable ({type(error).__name__}).") from error
+    if response.status_code == 422:
+        return False, "The diagram is empty or too long to check."
+    if response.status_code != 200:
+        raise ScoringError(f"The sandbox returned HTTP {response.status_code}.")
+    body = response.json()
+    if body["valid"]:
+        return True, "The Mermaid parser accepted the diagram."
+    return False, f"The Mermaid parser rejected the diagram: {body['error']}"
+
+
+async def score_constraints(
+    task: Task, answer: str, settings: Settings, parse_mermaid: MermaidParser | None = None
+) -> ScoreResult:
+    """Check an open-ended answer against the task's stated limits.
+
+    The result is "constraints met X of Y". It is not a verdict on quality, so
+    `passed` stays None.
+    """
+
+    async def default_parser(code: str) -> tuple[bool, str]:
+        return await parse_mermaid_in_sandbox(settings, code)
+
+    try:
+        checks = await run_checks(
+            list(task.scorer_config.get("checks", [])), answer, parse_mermaid or default_parser
+        )
+    except ConstraintConfigError as error:
+        raise ScoringError(str(error)) from error
+    met = sum(check.passed for check in checks)
+    missed = [check.name for check in checks if not check.passed]
+    explanation = f"Constraints met: {met} of {len(checks)}."
+    if missed:
+        explanation += f" Not met: {'; '.join(missed)}."
+    return ScoreResult(
+        passed=None,
+        score=met / len(checks),
+        scorer_type=task.scorer_type,
+        explanation=explanation,
+        checks=tuple(checks),
+    )
 
 
 JUDGE_INSTRUCTIONS = (
@@ -212,9 +285,13 @@ async def score_answer(
     contestant_families: Collection[str] = (),
     pricing: PricingTable | None = None,
 ) -> ScoreResult:
-    """Score a final answer. A missing answer fails without calling any scorer."""
+    """Score a final answer. A missing answer meets nothing and passes nothing."""
     if answer is None or not answer.strip():
+        if task.scorer_type == "constraints":
+            return ScoreResult(None, 0.0, task.scorer_type, "The agent gave no answer.")
         return _result(task, False, "The agent gave no answer.")
+    if task.scorer_type == "constraints":
+        return await score_constraints(task, answer, settings)
     if task.scorer_type == "exact":
         return score_exact(task, answer)
     if task.scorer_type == "numeric_tolerance":

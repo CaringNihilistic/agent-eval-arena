@@ -28,7 +28,11 @@ export type AgentBackend = "litellm" | "agent_sdk";
 export type ToolName = "calculator" | "python_exec" | "search_docs" | "read_file";
 export type MessageRole = "system" | "user" | "assistant" | "tool";
 export type StopReason = "answered" | "max_steps" | "max_tokens" | "max_cost" | "timeout" | "error";
-export type ScorerType = "exact" | "numeric_tolerance" | "regex" | "python_check" | "llm_judge";
+/**
+ * How a run was scored. `constraints` checks an open-ended answer against the task's stated limits; it says nothing about quality.
+ */
+export type ScorerType =
+  "exact" | "numeric_tolerance" | "regex" | "python_check" | "llm_judge" | "constraints";
 
 export interface RunStartedEvent {
   run_id: string;
@@ -256,13 +260,28 @@ export interface ScoreComputedEvent {
   payload: ScoreComputedPayload;
 }
 /**
- * Never sent in the blind view.
+ * Never sent in the blind view. For tasks with a right answer, `passed` says whether the answer was right. For open-ended tasks `passed` is null, `checks` lists the constraint checks, and `score` is the share of them that were met.
  */
 export interface ScoreComputedPayload {
-  passed: boolean;
+  /**
+   * Null for open-ended tasks, where there is no right answer to check.
+   */
+  passed: boolean | null;
   score: number;
   scorer_type: ScorerType;
   explanation: string;
+  /**
+   * Empty for tasks with a right answer.
+   */
+  checks: ConstraintCheck[];
+}
+/**
+ * One automatic check of an open-ended answer against a limit the task stated.
+ */
+export interface ConstraintCheck {
+  name: string;
+  passed: boolean;
+  detail: string;
 }
 export interface ErrorEvent {
   run_id: string;

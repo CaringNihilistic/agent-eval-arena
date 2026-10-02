@@ -1,0 +1,21 @@
+id: diagram-01
+title: "Flowchart of order fulfilment"
+category: diagram
+difficulty: medium
+prompt: |
+  Draw a Mermaid flowchart of this process. A customer places an order. If the item is in stock, it is packed and shipped. If it is not in stock, the customer is offered a backorder. If they accept, the order waits for a restock and is then packed and shipped. If they decline, the order is refunded.
+  Limits: at most 20 lines. Answer with the Mermaid code only, with no explanation.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "mermaid", "diagram": "flowchart"}
+    - {"type": "max_lines", "value": 20}
+    - {"type": "mentions", "name": "shows stock check, backorder, shipping, and refund", "all_of": ["stock", "backorder", "ship", "refund"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "flowchart TD\n  A[Customer places order] --> B{In stock?}\n  B -- Yes --> C[Pack order]\n  C --> D[Ship order]\n  B -- No --> E{Accept backorder?}\n  E -- Yes --> F[Wait for restock]\n  F --> C\n  E -- No --> G[Refund order]"
+  wrong:
+    - "Here is the process: first the order is placed, then we check stock, then ship or refund or backorder."
+    - "flowchart TD\n  A[Customer places order --> B{In stock?}\n  B --> C[Ship, backorder, refund"

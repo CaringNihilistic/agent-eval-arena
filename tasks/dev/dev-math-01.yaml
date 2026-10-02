@@ -1,6 +1,6 @@
 id: dev-math-01
 title: Bulk order with a discount
-category: math
+category: agent
 difficulty: easy
 prompt: |
   A workshop orders 37 boxes of screws at $4.85 per box and 12 drill bits at $13.40 each.

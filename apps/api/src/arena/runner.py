@@ -11,6 +11,7 @@ from arena.backends.base import AgentBackend, BackendUnavailableError
 from arena.backends.claude_auth import SubscriptionAuthError
 from arena.backends.litellm_loop import LiteLLMLoopBackend
 from arena.config import AgentConfig, Task
+from arena.constraints import count_words
 from arena.events import Emitter, Event, Sink
 from arena.llm import LLMClient
 from arena.pricing import PricingTable, assert_runnable, default_pricing
@@ -45,6 +46,13 @@ class RunResult:
     passed: bool | None = None
     score: float | None = None
     score_explanation: str | None = None
+    # Constraint checks, for open-ended tasks. Empty otherwise.
+    checks: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def answer_words(self) -> int:
+        """Length of the final answer, for the length-bias report."""
+        return count_words(self.final_answer or "")
 
     @property
     def total_tokens(self) -> int:
@@ -140,6 +148,7 @@ async def run_agent(
     passed: bool | None = None
     points: float | None = None
     explanation: str | None = None
+    checks: list[dict[str, Any]] = []
     # A run the provider cut short is re-run, so it is not scored.
     if score and not ctx.abandoned:
         try:
@@ -155,6 +164,7 @@ async def run_agent(
             ctx.error(f"the answer could not be scored: {error}", recoverable=True)
         else:
             passed, points, explanation = verdict.passed, verdict.score, verdict.explanation
+            checks = [check.as_payload() for check in verdict.checks]
             ctx.emitter.emit(
                 "score_computed",
                 {
@@ -162,6 +172,7 @@ async def run_agent(
                     "score": verdict.score,
                     "scorer_type": verdict.scorer_type,
                     "explanation": verdict.explanation,
+                    "checks": checks,
                 },
             )
 
@@ -184,4 +195,5 @@ async def run_agent(
         passed=passed,
         score=points,
         score_explanation=explanation,
+        checks=checks,
     )

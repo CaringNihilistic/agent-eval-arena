@@ -148,7 +148,7 @@ def make_task(**overrides: object) -> Task:
     fields: dict[str, Any] = {
         "id": "test-task",
         "title": "A test task",
-        "category": "math",
+        "category": "agent",
         "difficulty": "easy",
         "prompt": "What is 6 times 7?",
         "required_tools": ["calculator"],

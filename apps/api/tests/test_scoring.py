@@ -317,6 +317,7 @@ async def test_a_run_ends_with_a_score_event_after_run_finished(tmp_path: Path) 
         "score": 1.0,
         "scorer_type": "exact",
         "explanation": "Matches the expected answer.",
+        "checks": [],
     }
 
 
@@ -372,9 +373,9 @@ async def test_scoring_can_be_switched_off(tmp_path: Path) -> None:
 
 async def test_evaluate_runs_each_task_once_and_summarises(tmp_path: Path) -> None:
     tasks = [
-        fakes.make_task(id="t-pass", category="math"),
-        fakes.make_task(id="t-fail", category="math"),
-        fakes.make_task(id="t-skip", category="tool_trap"),
+        fakes.make_task(id="t-pass", category="code"),
+        fakes.make_task(id="t-fail", category="code"),
+        fakes.make_task(id="t-skip", category="agent"),
     ]
     scripts = {
         "t-pass": ScriptedLLM(submits("42", prompt_tokens=300, completion_tokens=50)),
@@ -400,12 +401,12 @@ async def test_evaluate_runs_each_task_once_and_summarises(tmp_path: Path) -> No
     assert seen == ["t-pass", "t-fail", "t-skip"]
     assert [row.outcome for row in rows] == ["pass", "fail", "not run"]
     summary = summarise(rows)
-    assert summary[0] == "passed 1 of 2 scored runs (50%)"
-    assert "  math           1 of 2" in summary
+    assert summary[0] == "passed 1 of 2 runs with a right answer (50%)"
+    assert "  code           1 of 2" in summary
     assert "not run (provider refused or rate-limited): 1" in summary
     assert summary[-1].startswith("tokens 470, actual cost $0.0000, at paid rates $")
     line = format_row(rows[0])
-    assert line.startswith("t-pass     math           pass")
+    assert line.startswith("t-pass     code           pass")
     assert line.rstrip().endswith("42")
 
 

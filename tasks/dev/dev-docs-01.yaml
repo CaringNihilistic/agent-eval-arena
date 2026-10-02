@@ -1,6 +1,6 @@
 id: dev-docs-01
 title: Who runs the ferry operator
-category: multi_hop
+category: agent
 difficulty: easy
 prompt: |
   Who is the current director of the organisation that operates the Harbor Ferry?

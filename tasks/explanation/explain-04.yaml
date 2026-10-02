@@ -1,0 +1,23 @@
+id: explain-04
+title: "Big-O notation for a student"
+category: explanation
+difficulty: hard
+prompt: |
+  Explain Big-O notation to a first-year student who can write a loop.
+  Limits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Use the notations O(n) and O(1).
+  Answer with the explanation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 170}
+    - {"type": "section", "label": "Analogy:"}
+    - {"type": "section", "label": "Example:"}
+    - {"type": "mentions", "name": "uses O(n) and O(1)", "all_of": ["O(n)", "O(1)"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Big-O notation describes how the work an algorithm does grows as its input grows. It ignores exact timings and keeps only the shape of the growth.\n\nAnalogy: Finding a name in an unsorted pile of cards means checking them one by one, so twice the cards means twice the work. Looking at the top card takes the same time however tall the pile is.\n\nExample: Searching a list of n numbers for a value with a loop may look at every number, so it is O(n): 1,000 numbers take up to 1,000 steps. Reading the first element of the list is O(1): it takes one step whether the list has ten items or ten million."
+  wrong:
+    - "Big-O is about how fast algorithms are. O(n) is linear."
+    - "Analogy: cards.\nExample: a loop."

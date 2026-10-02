@@ -1,0 +1,28 @@
+id: writing-02
+title: "Rewrite a messy paragraph"
+category: writing
+difficulty: easy
+prompt: |
+  Rewrite this paragraph so it is clear and short:
+
+  "So basically what happened is that the meeting, which was originally going to be on Monday, has now been moved, due to the fact that several people could not make it, to Thursday at 14:00, and also it will not be in the usual room but instead in Room 204, and everyone should, if at all possible, bring their laptop because we will be doing the budget review together."
+
+  Limits: at most 45 words and at most three sentences. Keep the day, the time, the room, and the request to bring a laptop.
+  Answer with the rewritten paragraph only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 45}
+    - {"type": "sentences", "min": 1, "max": 3}
+    - {"type": "mentions", "name": "keeps the day", "any_of": ["Thursday"]}
+    - {"type": "mentions", "name": "keeps the time", "any_of": ["14:00", "2 pm", "2pm", "2:00 pm"]}
+    - {"type": "mentions", "name": "keeps the room", "any_of": ["Room 204"]}
+    - {"type": "mentions", "name": "keeps the laptop request", "any_of": ["laptop"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "The meeting has moved from Monday to Thursday at 14:00 in Room 204. Please bring your laptop for the budget review."
+  wrong:
+    - "The meeting has moved to Thursday. Please bring your laptop."
+    - "So the meeting was going to be on Monday. But then people could not come. So now it is on Thursday at 14:00. It is in Room 204. Bring a laptop."

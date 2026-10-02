@@ -1,0 +1,24 @@
+id: writing-03
+title: "Product description for a backpack"
+category: writing
+difficulty: easy
+prompt: |
+  Write a product description for the Tern 2 commuter backpack. Facts: 22-litre capacity; weighs 780 grams; padded sleeve for a 16-inch laptop; made from recycled sailcloth; rain cover included.
+  Limits: at most 60 words. Mention the capacity, the laptop sleeve, and the recycled material. Do not mention a price.
+  Answer with the description only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 60}
+    - {"type": "mentions", "name": "mentions the capacity", "any_of": ["22-litre", "22 litre", "22-liter", "22 liter", "22 l", "22l"]}
+    - {"type": "mentions", "name": "mentions the laptop sleeve", "any_of": ["laptop"]}
+    - {"type": "mentions", "name": "mentions the recycled material", "any_of": ["recycled"]}
+    - {"type": "excludes", "name": "does not mention a price", "terms": ["$", "€", "£", "price"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "The Tern 2 carries your whole working day in 22 litres and still weighs only 780 grams. A padded sleeve protects a 16-inch laptop, the shell is cut from recycled sailcloth, and a rain cover is tucked into the base for wet commutes."
+  wrong:
+    - "The Tern 2 is a great backpack for commuters at a great price of $89."
+    - "A backpack made from recycled sailcloth with a padded laptop sleeve."

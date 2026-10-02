@@ -69,7 +69,26 @@
     "ScorerType": {
       "title": "ScorerType",
       "type": "string",
-      "enum": ["exact", "numeric_tolerance", "regex", "python_check", "llm_judge"]
+      "enum": ["exact", "numeric_tolerance", "regex", "python_check", "llm_judge", "constraints"],
+      "description": "How a run was scored. `constraints` checks an open-ended answer against the task's stated limits; it says nothing about quality."
+    },
+    "ConstraintCheck": {
+      "title": "ConstraintCheck",
+      "description": "One automatic check of an open-ended answer against a limit the task stated.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "passed", "detail"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
     },
     "MessageRole": {
       "title": "MessageRole",
@@ -457,13 +476,14 @@
     },
     "ScoreComputedPayload": {
       "title": "ScoreComputedPayload",
-      "description": "Never sent in the blind view.",
+      "description": "Never sent in the blind view. For tasks with a right answer, `passed` says whether the answer was right. For open-ended tasks `passed` is null, `checks` lists the constraint checks, and `score` is the share of them that were met.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["passed", "score", "scorer_type", "explanation"],
+      "required": ["passed", "score", "scorer_type", "explanation", "checks"],
       "properties": {
         "passed": {
-          "type": "boolean"
+          "description": "Null for open-ended tasks, where there is no right answer to check.",
+          "type": ["boolean", "null"]
         },
         "score": {
           "type": "number",
@@ -475,6 +495,13 @@
         },
         "explanation": {
           "type": "string"
+        },
+        "checks": {
+          "description": "Empty for tasks with a right answer.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConstraintCheck"
+          }
         }
       }
     },

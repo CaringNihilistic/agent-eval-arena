@@ -59,7 +59,7 @@ def test_committed_tasks_load_and_only_need_tools_that_exist() -> None:
 
 def test_duplicate_task_ids_are_rejected(tmp_path: Path) -> None:
     body = (
-        "id: same\ntitle: t\ncategory: math\ndifficulty: easy\nprompt: p\n"
+        "id: same\ntitle: t\ncategory: agent\ndifficulty: easy\nprompt: p\n"
         "required_tools: []\nscorer_type: exact\nscorer_config: {expected: x}\n"
         "examples: {correct: [x], wrong: [y]}\n"
     )

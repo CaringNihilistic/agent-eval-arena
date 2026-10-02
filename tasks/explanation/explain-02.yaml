@@ -1,0 +1,23 @@
+id: explain-02
+title: "Hash tables for a beginner"
+category: explanation
+difficulty: medium
+prompt: |
+  Explain how a hash table works to a beginner who knows what a list is.
+  Limits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Use the words 'key' and 'collision'.
+  Answer with the explanation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 170}
+    - {"type": "section", "label": "Analogy:"}
+    - {"type": "section", "label": "Example:"}
+    - {"type": "mentions", "name": "uses 'key' and 'collision'", "all_of": ["key", "collision"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "A hash table stores values so that you can find one by its key almost instantly, without searching the whole collection. It runs the key through a hash function, which turns it into a number, and uses that number as the position where the value is kept.\n\nAnalogy: A cloakroom gives each coat a numbered ticket. To get the coat back, the attendant goes straight to that hook instead of checking every coat.\n\nExample: With 10 slots and the key \"cat\", suppose the hash function gives 37. 37 modulo 10 is 7, so the value goes in slot 7. If \"dog\" also lands in slot 7, that is a collision, and the table keeps both entries in that slot and checks the key when you look one up."
+  wrong:
+    - "A hash table is a data structure with keys and values."
+    - "Analogy: a cloakroom.\nExample: slot 7. A hash table is fast."

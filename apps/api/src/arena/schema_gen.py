@@ -7,6 +7,15 @@ from typing import Annotated, Any, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 
 
+class ConstraintCheck(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: str
+    passed: bool
+    detail: str
+
+
 class ConfigSnapshot(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -214,13 +223,22 @@ class ScoreComputedPayload(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    passed: bool
+    passed: Annotated[
+        bool | None,
+        Field(description="Null for open-ended tasks, where there is no right answer to check."),
+    ]
     score: Annotated[float, Field(ge=0.0, le=1.0)]
     scorer_type: Annotated[
-        Literal["exact", "numeric_tolerance", "regex", "python_check", "llm_judge"],
-        Field(title="ScorerType"),
+        Literal["exact", "numeric_tolerance", "regex", "python_check", "llm_judge", "constraints"],
+        Field(
+            description="How a run was scored. `constraints` checks an open-ended answer against the task's stated limits; it says nothing about quality.",
+            title="ScorerType",
+        ),
     ]
     explanation: str
+    checks: Annotated[
+        list[ConstraintCheck], Field(description="Empty for tasks with a right answer.")
+    ]
 
 
 class ErrorPayload(BaseModel):

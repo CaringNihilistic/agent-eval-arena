@@ -1,0 +1,29 @@
+id: stack-02
+title: "Sensor dashboard"
+category: tech_stack
+difficulty: hard
+prompt: |
+  Recommend a technology stack for this project.
+
+  A factory wants a live dashboard for 10,000 sensors that each send a reading every 10 seconds. Five engineers have 4 months. The cloud bill must stay under $2,000 a month.
+
+  Limits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.
+  Answer with the recommendation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 150}
+    - {"type": "section", "label": "Stack:"}
+    - {"type": "section_lines", "label": "Reasoning:", "min": 3, "max": 5, "until": ["Stack:"]}
+    - {"type": "mentions", "name": "refers to the budget", "any_of": ["$2,000", "2,000", "budget"]}
+    - {"type": "mentions", "name": "refers to the team", "any_of": ["five engineers", "5 engineers", "team of five"]}
+    - {"type": "mentions", "name": "refers to the deadline", "any_of": ["4 months", "four months", "deadline"]}
+    - {"type": "mentions", "name": "refers to the scale", "any_of": ["10,000", "1,000 readings", "per second"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Stack: MQTT broker, Go ingestion service, TimescaleDB, Grafana, React front end\nReasoning:\n10,000 sensors every 10 seconds is about 1,000 readings a second, which one TimescaleDB node handles.\nGrafana gives live charts without building them, which protects the 4 months deadline.\nFive engineers can split into ingestion, storage, and front end with little overlap.\nThree mid-sized machines and managed MQTT fit well inside the $2,000 budget."
+  wrong:
+    - "Stack: Excel\nReasoning: cheap"
+    - "A time-series database would be good for this kind of project."

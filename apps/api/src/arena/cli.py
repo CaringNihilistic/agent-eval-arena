@@ -65,7 +65,7 @@ def describe(event: Event) -> str:
                 f"${payload['reference_cost_usd']:.6f} at paid rates"
             )
         case "score_computed":
-            verdict = "PASS" if payload["passed"] else "FAIL"
+            verdict = {True: "PASS", False: "FAIL", None: "CONSTRAINTS"}[payload["passed"]]
             detail = f"{verdict} ({payload['scorer_type']}): {payload['explanation']}"
         case "error":
             detail = payload["message"]
@@ -165,7 +165,9 @@ def eval_config(
     config: Annotated[str, typer.Option(help="Config name, for example qwen-full")],
     category: Annotated[
         str | None,
-        typer.Option(help="Only this category: math, data_analysis, multi_hop, tool_trap"),
+        typer.Option(
+            help="Only this category: writing, diagram, explanation, tech_stack, code, agent"
+        ),
     ] = None,
     task: Annotated[list[str] | None, typer.Option(help="Only these task ids (repeatable)")] = None,
     include_dev: Annotated[

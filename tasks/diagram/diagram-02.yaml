@@ -1,0 +1,21 @@
+id: diagram-02
+title: "System architecture"
+category: diagram
+difficulty: medium
+prompt: |
+  Draw a Mermaid flowchart of this system. A Web App sends every request to an API Gateway. The gateway calls the Auth Service to check the user, and the Orders Service for order data. The Orders Service reads and writes a PostgreSQL database and uses a Redis cache.
+  Limits: at most 18 lines. Name all six components. Answer with the Mermaid code only, with no explanation.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "mermaid", "diagram": "flowchart"}
+    - {"type": "max_lines", "value": 18}
+    - {"type": "mentions", "name": "names all six components", "all_of": ["Web App", "API Gateway", "Auth Service", "Orders Service", "PostgreSQL", "Redis"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "flowchart LR\n  web[Web App] --> gw[API Gateway]\n  gw --> auth[Auth Service]\n  gw --> orders[Orders Service]\n  orders --> db[(PostgreSQL)]\n  orders --> cache[(Redis)]"
+  wrong:
+    - "flowchart LR\n  web[Web App] --> gw[API Gateway]\n  gw --> orders[Orders Service]"
+    - "sequenceDiagram\n  Web App->>API Gateway: request"

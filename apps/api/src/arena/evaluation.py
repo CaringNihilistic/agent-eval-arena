@@ -19,6 +19,9 @@ class EvalRow:
     def outcome(self) -> str:
         if self.result.abandoned:
             return "not run"
+        if self.result.checks:
+            met = sum(check["passed"] for check in self.result.checks)
+            return f"{met}/{len(self.result.checks)}"
         if self.result.passed is None:
             return "unscored"
         return "pass" if self.result.passed else "fail"
@@ -70,7 +73,15 @@ def summarise(rows: Sequence[EvalRow]) -> list[str]:
     unscored = sum(row.outcome == "unscored" for row in rows)
     passed = sum(row.outcome == "pass" for row in scored)
     rate = f"{100 * passed / len(scored):.0f}%" if scored else "n/a"
-    lines.append(f"passed {passed} of {len(scored)} scored runs ({rate})")
+    lines.append(f"passed {passed} of {len(scored)} runs with a right answer ({rate})")
+    open_ended = [row for row in rows if row.result.checks]
+    if open_ended:
+        met = sum(c["passed"] for row in open_ended for c in row.result.checks)
+        total = sum(len(row.result.checks) for row in open_ended)
+        lines.append(
+            f"open-ended runs: {len(open_ended)}, constraints met {met} of {total} "
+            "(limits respected, not quality)"
+        )
     for category in sorted({row.task.category for row in scored}):
         group = [row for row in scored if row.task.category == category]
         lines.append(f"  {category:<14} {sum(r.outcome == 'pass' for r in group)} of {len(group)}")

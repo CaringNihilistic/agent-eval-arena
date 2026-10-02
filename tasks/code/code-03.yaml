@@ -1,0 +1,35 @@
+id: code-03
+title: "Fix the chunk function"
+category: code
+difficulty: medium
+prompt: |
+  This function should split a list into consecutive chunks of the given size, with a shorter last chunk if needed. It sometimes loses the last item. It should also raise ValueError if size is less than 1.
+
+  def chunk(items, size):
+      return [items[i:i + size] for i in range(0, len(items) - 1, size)]
+
+  Answer with the corrected Python function only.
+required_tools: [python_exec]
+scorer_type: python_check
+scorer_config:
+  checker: code_tests
+  # The checker runs the agent's code, so a hang or crash is the answer's failure.
+  crash_is_failure: true
+  function: chunk
+  # Hidden tests. Never sent to the agent or the browser.
+  cases:
+    - {"args": [[1, 2, 3, 4, 5], 2], "expected": [[1, 2], [3, 4], [5]]}
+    - {"args": [[1, 2, 3, 4], 2], "expected": [[1, 2], [3, 4]]}
+    - {"args": [[], 3], "expected": []}
+    - {"args": [[1], 1], "expected": [[1]]}
+    - {"args": [[1, 2, 3], 5], "expected": [[1, 2, 3]]}
+    - {"args": [[1, 2, 3, 4, 5, 6, 7], 3], "expected": [[1, 2, 3], [4, 5, 6], [7]]}
+    - {"args": [[1, 2], 0], "raises": "ValueError"}
+    - {"args": [[1, 2], -1], "raises": "ValueError"}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "def chunk(items, size):\n    if size < 1:\n        raise ValueError('size must be at least 1')\n    return [items[i:i + size] for i in range(0, len(items), size)]"
+  wrong:
+    - "def chunk(items, size):\n    return [items[i:i + size] for i in range(0, len(items) - 1, size)]"
+    - "def chunk(items, size):\n    return [items[i:i + size] for i in range(0, len(items), size)]"

@@ -1,0 +1,29 @@
+id: stack-04
+title: "Mobile app for a food co-op"
+category: tech_stack
+difficulty: medium
+prompt: |
+  Recommend a technology stack for this project.
+
+  A food co-operative with 5,000 members wants an iOS and Android app for ordering weekly boxes. Three developers, all with JavaScript experience, have 3 months. The running cost must stay under $300 a month.
+
+  Limits: at most 150 words. Answer in this form: one line starting with 'Stack:' that lists the technologies, then a line 'Reasoning:' followed by three to five lines, one reason per line. The reasons must refer to the budget, the team, the deadline, and the scale.
+  Answer with the recommendation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 150}
+    - {"type": "section", "label": "Stack:"}
+    - {"type": "section_lines", "label": "Reasoning:", "min": 3, "max": 5, "until": ["Stack:"]}
+    - {"type": "mentions", "name": "refers to the budget", "any_of": ["$300", "budget"]}
+    - {"type": "mentions", "name": "refers to the team", "any_of": ["three developers", "3 developers", "JavaScript"]}
+    - {"type": "mentions", "name": "refers to the deadline", "any_of": ["3 months", "three months", "deadline"]}
+    - {"type": "mentions", "name": "refers to the scale", "any_of": ["5,000"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Stack: React Native with Expo, Supabase (Postgres, auth), Stripe\nReasoning:\nReact Native lets three developers who know JavaScript ship iOS and Android from one codebase.\nExpo handles builds and store releases, which keeps the 3 months deadline realistic.\nSupabase's paid tier is well under the $300 budget.\n5,000 members ordering weekly is a light load for one Postgres database."
+  wrong:
+    - "Stack: Swift and Kotlin\nReasoning:\nNative is best.\nIt is fast."
+    - "Use React Native."

@@ -1,0 +1,23 @@
+id: explain-01
+title: "Recursion for a new programmer"
+category: explanation
+difficulty: medium
+prompt: |
+  Explain recursion to someone who has just started programming.
+  Limits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Mention the base case.
+  Answer with the explanation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 170}
+    - {"type": "section", "label": "Analogy:"}
+    - {"type": "section", "label": "Example:"}
+    - {"type": "mentions", "name": "mentions the base case", "any_of": ["base case"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Recursion is when a function solves a problem by calling itself on a smaller version of the same problem, until the problem is small enough to answer directly. That smallest version is the base case, and without it the function would never stop.\n\nAnalogy: You are in a queue and want to know your position. You ask the person in front, who asks the person in front of them, until the first person says \"one\". Each person then adds one and passes the answer back.\n\nExample: factorial(4) is 4 times factorial(3), which is 3 times factorial(2), which is 2 times factorial(1). The base case is factorial(1) = 1, so the answers multiply back up: 2, then 6, then 24."
+  wrong:
+    - "Recursion is when a function calls itself. It is used a lot in programming and is very elegant."
+    - "Analogy: a queue of people.\nExample: factorial."

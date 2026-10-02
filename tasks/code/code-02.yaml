@@ -1,0 +1,34 @@
+id: code-02
+title: "Parse a duration string"
+category: code
+difficulty: medium
+prompt: |
+  Write a Python function parse_duration(text) that turns a duration such as '1h30m' into a number of seconds. The text is one or more parts, each a whole number followed by h, m, or s, in any order, for example '2h', '45s', '1h1m1s', '90m'. Raise ValueError if the text is empty or contains anything else.
+  Answer with the Python function only.
+required_tools: [python_exec]
+scorer_type: python_check
+scorer_config:
+  checker: code_tests
+  # The checker runs the agent's code, so a hang or crash is the answer's failure.
+  crash_is_failure: true
+  function: parse_duration
+  # Hidden tests. Never sent to the agent or the browser.
+  cases:
+    - {"args": ["1h30m"], "expected": 5400}
+    - {"args": ["45s"], "expected": 45}
+    - {"args": ["2h"], "expected": 7200}
+    - {"args": ["1h1m1s"], "expected": 3661}
+    - {"args": ["90m"], "expected": 5400}
+    - {"args": ["10s5m"], "expected": 310}
+    - {"args": [""], "raises": "ValueError"}
+    - {"args": ["abc"], "raises": "ValueError"}
+    - {"args": ["10x"], "raises": "ValueError"}
+    - {"args": ["5"], "raises": "ValueError"}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "import re\n\ndef parse_duration(text):\n    if not text or not re.fullmatch(r'(\\d+[hms])+', text):\n        raise ValueError(f'not a duration: {text!r}')\n    units = {'h': 3600, 'm': 60, 's': 1}\n    return sum(int(n) * units[u] for n, u in re.findall(r'(\\d+)([hms])', text))"
+  wrong:
+    - "def parse_duration(text):\n    return int(text[:-1]) * {'h': 3600, 'm': 60, 's': 1}[text[-1]]"
+    - "def parse_duration(text):\n    while True:\n        pass"
+    - "def duration(text):\n    return 0"

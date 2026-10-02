@@ -1,0 +1,31 @@
+id: code-05
+title: "Most frequent words"
+category: code
+difficulty: medium
+prompt: |
+  Write a Python function top_words(text, k). Split the text on whitespace, treat words case-insensitively, and return a list of the k most frequent words in lower case, most frequent first. Words with the same count are ordered alphabetically. If there are fewer than k different words, return them all.
+  Answer with the Python function only.
+required_tools: [python_exec]
+scorer_type: python_check
+scorer_config:
+  checker: code_tests
+  # The checker runs the agent's code, so a hang or crash is the answer's failure.
+  crash_is_failure: true
+  function: top_words
+  # Hidden tests. Never sent to the agent or the browser.
+  cases:
+    - {"args": ["the cat and the hat and the bat", 2], "expected": ["the", "and"]}
+    - {"args": ["b a b a c", 2], "expected": ["a", "b"]}
+    - {"args": ["Hello hello HELLO world", 1], "expected": ["hello"]}
+    - {"args": ["", 3], "expected": []}
+    - {"args": ["one two", 5], "expected": ["one", "two"]}
+    - {"args": ["z y x", 3], "expected": ["x", "y", "z"]}
+    - {"args": ["a a b b c", 1], "expected": ["a"]}
+    - {"args": ["Tea tea Coffee coffee coffee milk", 2], "expected": ["coffee", "tea"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "from collections import Counter\n\ndef top_words(text, k):\n    counts = Counter(word.lower() for word in text.split())\n    ranked = sorted(counts, key=lambda word: (-counts[word], word))\n    return ranked[:k]"
+  wrong:
+    - "from collections import Counter\n\ndef top_words(text, k):\n    return [word for word, _ in Counter(text.split()).most_common(k)]"
+    - "def top_words(text, k):\n    return sorted(set(text.lower().split()))[:k]"

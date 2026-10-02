@@ -16,77 +16,11 @@ from pathlib import Path
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
-CUSTOMERS = [
-    "Alder & Finch", "Brightwater Co", "Cobalt Works", "Dunmore Supply",
-    "Elmstead Ltd", "Farrow Goods", "Greyfield Inc", "Harrow Lane",
-]  # fmt: skip
-REGIONS = {"Alder & Finch": "north", "Brightwater Co": "south", "Cobalt Works": "east",
-           "Dunmore Supply": "west", "Elmstead Ltd": "north", "Farrow Goods": "south",
-           "Greyfield Inc": "east", "Harrow Lane": "west"}  # fmt: skip
-PRODUCTS = {"anchor bolt": 2.40, "brass hinge": 6.75, "cable reel": 48.00,
-            "drill bit set": 19.90, "epoxy kit": 12.50, "flange plate": 31.25}  # fmt: skip
-
-
 def write_csv(name: str, header: list[str], rows: list[list[object]]) -> None:
     with (FIXTURES / name).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(header)
         writer.writerows(rows)
-
-
-def orders() -> None:
-    rng = random.Random(20261001)
-    rows = []
-    start = date(2026, 1, 5)
-    for number in range(1, 73):
-        customer = rng.choice(CUSTOMERS)
-        product = rng.choice(list(PRODUCTS))
-        day = start + timedelta(days=rng.randrange(0, 175))
-        status = rng.choices(["completed", "cancelled", "refunded"], weights=[80, 12, 8])[0]
-        rows.append(
-            [f"ORD-{number:04d}", day.isoformat(), customer, REGIONS[customer], product,
-             rng.randint(1, 40), f"{PRODUCTS[product]:.2f}", status]  # fmt: skip
-        )
-    rows.sort(key=lambda row: (row[1], row[0]))
-    write_csv(
-        "orders.csv",
-        ["order_id", "order_date", "customer", "region", "product", "quantity", "unit_price",
-         "status"],  # fmt: skip
-        rows,
-    )
-
-
-def employees() -> None:
-    rng = random.Random(20261002)
-    first = ["Ada", "Bram", "Cleo", "Dev", "Esme", "Faisal", "Greta", "Hugo", "Ines", "Jonas",
-             "Kira", "Leif", "Mona", "Nico", "Oona", "Pavel", "Quinn", "Rhea", "Sami", "Tova",
-             "Uri", "Vera", "Wim", "Xena", "Yara", "Zeno", "Arlo", "Bea"]  # fmt: skip
-    last = ["Abara", "Brandt", "Castell", "Dvorak", "Eklund", "Farid", "Greaves", "Halloran",
-            "Imura", "Jansen", "Kovacs", "Lindqvist", "Marchetti", "Novak", "Okonkwo", "Petrov",
-            "Quispe", "Rahimi", "Soler", "Takeda", "Ueda", "Vasquez", "Whitlock", "Xiong",
-            "Yilmaz", "Zamora", "Achterberg", "Bellamy"]  # fmt: skip
-    departments = ["Engineering", "Sales", "Support", "Finance"]
-    bands = {"Engineering": (78, 132), "Sales": (52, 96), "Support": (44, 70), "Finance": (60, 110)}
-    rows = []
-    managers: dict[str, int] = {}
-    for index in range(28):
-        employee_id = 100 + index
-        department = departments[index % 4]
-        low, high = bands[department]
-        salary = rng.randrange(low, high) * 1000 + rng.choice([0, 250, 500, 750])
-        started = date(2014, 1, 1) + timedelta(days=rng.randrange(0, 4300))
-        if department not in managers:
-            managers[department] = employee_id
-            manager: object = ""
-        else:
-            manager = managers[department]
-        rows.append([employee_id, f"{first[index]} {last[index]}", department, salary,
-                     started.isoformat(), manager])  # fmt: skip
-    write_csv(
-        "employees.csv",
-        ["employee_id", "name", "department", "salary", "start_date", "manager_id"],
-        rows,
-    )
 
 
 def sensor_readings() -> None:
@@ -162,6 +96,6 @@ def notice() -> None:
 
 if __name__ == "__main__":
     FIXTURES.mkdir(exist_ok=True)
-    for build in (orders, employees, sensor_readings, inventory, server_log, notice):
+    for build in (sensor_readings, inventory, server_log, notice):
         build()
         print("wrote", build.__name__)

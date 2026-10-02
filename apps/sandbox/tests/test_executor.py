@@ -12,7 +12,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from sandbox.executor import WORK_ROOT, ExecLimits, ExecResult, execute, stray_processes
+from sandbox.executor import (
+    WORK_ROOT,
+    ExecLimits,
+    ExecResult,
+    execute,
+    parse_mermaid,
+    stray_processes,
+)
 from sandbox.main import FIXTURES_DIR, MAX_CODE_CHARS, app
 
 
@@ -246,3 +253,42 @@ def test_exec_endpoint_rejects_oversized_code_and_long_timeouts() -> None:
     assert client.post("/exec", json={"code": "x" * (MAX_CODE_CHARS + 1)}).status_code == 422
     assert client.post("/exec", json={"code": "print(1)", "timeout_s": 60}).status_code == 422
     assert client.post("/exec", json={"code": ""}).status_code == 422
+
+
+FLOWCHART = (
+    "flowchart TD\n"
+    "  A[Order placed] --> B{In stock?}\n"
+    "  B -- Yes --> C[Ship]\n"
+    "  B -- No --> D[Refund]"
+)
+SEQUENCE = "sequenceDiagram\n  participant U as User\n  U->>A: Log in\n  A-->>U: Token"
+STATE = "stateDiagram-v2\n  [*] --> Open\n  Open --> Closed\n  Closed --> [*]"
+
+
+async def test_mermaid_parser_accepts_valid_diagrams() -> None:
+    for diagram in (FLOWCHART, SEQUENCE, STATE):
+        verdict = await parse_mermaid(diagram)
+        assert verdict.valid, (diagram, verdict.error)
+        assert verdict.error is None
+
+
+async def test_mermaid_parser_rejects_text_that_is_not_a_diagram() -> None:
+    broken = await parse_mermaid("flowchart TD\n  A[Unclosed --> B")
+    prose = await parse_mermaid("Here is your diagram: boxes and arrows.")
+
+    assert not broken.valid
+    assert broken.error
+    assert not prose.valid
+    assert prose.error
+    assert stray_processes() == []
+
+
+def test_mermaid_endpoint() -> None:
+    client = TestClient(app)
+
+    good = client.post("/mermaid/parse", json={"code": FLOWCHART})
+    bad = client.post("/mermaid/parse", json={"code": "not a diagram"})
+
+    assert good.json() == {"valid": True, "error": None}
+    assert bad.json()["valid"] is False
+    assert client.post("/mermaid/parse", json={"code": ""}).status_code == 422

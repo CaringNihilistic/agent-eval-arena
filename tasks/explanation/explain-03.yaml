@@ -1,0 +1,23 @@
+id: explain-03
+title: "DNS for a non-technical reader"
+category: explanation
+difficulty: easy
+prompt: |
+  Explain what DNS does when you open a website to someone with no technical background.
+  Limits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Mention the IP address.
+  Answer with the explanation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 170}
+    - {"type": "section", "label": "Analogy:"}
+    - {"type": "section", "label": "Example:"}
+    - {"type": "mentions", "name": "mentions the IP address", "any_of": ["IP address"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Computers find each other using numbers, not names. DNS is the service that turns the name you type, such as example.org, into the numeric IP address of the computer that holds the site.\n\nAnalogy: It works like the contacts list in your phone. You tap a name, and the phone looks up the number and dials it for you.\n\nExample: You type example.org. Your browser asks a DNS server, \"what is the address for example.org?\" The server answers with an IP address such as 93.184.216.34. Your browser then connects to that address and the page loads. The answer is remembered for a while, so the next visit is faster."
+  wrong:
+    - "DNS is the Domain Name System and it is part of the internet."
+    - "Analogy: a phone book. DNS turns names into numbers."

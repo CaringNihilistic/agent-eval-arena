@@ -1,6 +1,6 @@
 id: dev-csv-01
 title: Highest-revenue region
-category: data_analysis
+category: agent
 difficulty: easy
 prompt: |
   The file dev_sales.csv in the fixtures directory has columns region, month, units, unit_price.

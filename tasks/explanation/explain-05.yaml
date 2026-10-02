@@ -1,0 +1,23 @@
+id: explain-05
+title: "Public-key encryption for a curious reader"
+category: explanation
+difficulty: hard
+prompt: |
+  Explain public-key encryption to a curious reader who has never studied cryptography.
+  Limits: at most 170 words. Include one analogy, on a line starting with 'Analogy:', and one worked example, on a line starting with 'Example:'. Use the words 'public key' and 'private key'.
+  Answer with the explanation only.
+required_tools: []
+scorer_type: constraints
+scorer_config:
+  checks:
+    - {"type": "max_words", "value": 170}
+    - {"type": "section", "label": "Analogy:"}
+    - {"type": "section", "label": "Example:"}
+    - {"type": "mentions", "name": "uses 'public key' and 'private key'", "all_of": ["public key", "private key"]}
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Public-key encryption lets someone send you a secret without the two of you ever sharing a password. You have two linked keys. The public key can be given to anyone and is used to lock a message. The private key stays with you and is the only thing that can unlock it.\n\nAnalogy: It is like a letterbox. Anyone can push a letter through the slot, but only the person with the key to the box can take the letters out.\n\nExample: Ana publishes her public key. Ben uses it to encrypt \"meet at six\" and sends the result. Anyone who intercepts it sees scrambled text. Ana decrypts it with her private key and reads the message."
+  wrong:
+    - "Encryption keeps data secret using keys."
+    - "Analogy: a letterbox with a public key.\nExample: Ana and Ben."
