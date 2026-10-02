@@ -84,6 +84,7 @@ async def test_tool_call_then_answer_produces_the_expected_trace(tmp_path: Path)
         "tool_result",
         "step_finished",
         "run_finished",
+        "score_computed",
     ]
     assert result.stop_reason == "answered"
     assert result.final_answer == "42"
@@ -165,7 +166,7 @@ async def test_stops_at_max_steps(tmp_path: Path) -> None:
     assert llm.calls == 3
     assert result.steps == 3
     assert result.final_answer is None
-    assert types(result)[-1] == "run_finished"
+    assert types(result)[-2:] == ["run_finished", "score_computed"]
 
 
 async def test_stops_at_the_token_limit(tmp_path: Path) -> None:
@@ -246,7 +247,7 @@ async def test_a_failed_model_call_ends_the_run_with_an_error(tmp_path: Path) ->
     error = payloads(result, "error")[0]
     assert "provider returned 500" in error["message"]
     assert error["step"] == 2
-    assert types(result)[-3:] == ["error", "step_finished", "run_finished"]
+    assert types(result)[-4:-1] == ["error", "step_finished", "run_finished"]
 
 
 async def test_an_empty_reply_is_an_error_not_an_answer(tmp_path: Path) -> None:
@@ -268,7 +269,7 @@ async def test_a_crash_in_the_loop_still_ends_with_a_complete_trace(tmp_path: Pa
     result = await run(tmp_path, ScriptedLLM(RuntimeError("bug in the loop")))
 
     assert result.stop_reason == "error"
-    assert types(result)[-1] == "run_finished"
+    assert types(result)[-2:] == ["run_finished", "score_computed"]
     assert "bug in the loop" in payloads(result, "error")[0]["message"]
 
 

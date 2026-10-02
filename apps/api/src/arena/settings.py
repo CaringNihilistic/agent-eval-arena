@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # refused unless this is set on purpose.
     allow_paid_models: bool = False
 
+    # Only for llm_judge tasks, of which the recorded bank has none. The judge's
+    # family must differ from every contestant's.
+    judge_model: str | None = None
+    judge_model_family: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

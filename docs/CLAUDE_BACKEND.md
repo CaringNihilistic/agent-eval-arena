@@ -229,26 +229,40 @@ Built as `apps/api/src/arena/backends/agent_sdk.py` and `claude_auth.py`, with C
 - A `PostToolUse` hook ends the session with no further model call once the run has stopped. Submitting an answer costs no extra request.
 - The usage status reported with each response includes whether extra usage would be accepted. It read `rejected`, meaning extra usage is off. The backend now refuses to continue if it ever reads `allowed`.
 
-**What each request contains besides our prompt and tools.** From the captured request (`docs/findings/claude-agent-sdk-request/first-request.json`):
+**Request settings were then brought in line with the other configs** (owner's instruction, same day). Verified with a fresh captured request per model:
 
-| Where                  | What Claude Code adds                                                                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| System prompt, block 1 | A billing header line: `x-anthropic-billing-header: cc_version=…; cc_entrypoint=sdk-py; …`                                                                               |
-| System prompt, block 2 | "You are a Claude agent, built on Anthropic's Claude Agent SDK."                                                                                                         |
-| System prompt, block 3 | Our prompt, unchanged                                                                                                                                                    |
-| First user message     | Three `<system-reminder>` blocks before the task: the environment (working directory, platform, OS version), the model's name and knowledge cutoff, and today's date     |
-| Tools                  | Ours only, named `mcp__arena__<name>`                                                                                                                                    |
-| Request settings       | `max_tokens: 32000`; extended thinking enabled with a 31,999-token budget; prompt caching with a one-hour lifetime; a context-management rule that keeps thinking blocks |
+| Model               | `max_tokens` | Thinking                                                                       | How                                                      |
+| ------------------- | ------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| `claude-haiku-4-5`  | 1,024        | Off: `thinking: {"type": "disabled"}`                                          | `CLAUDE_CODE_MAX_OUTPUT_TOKENS`, `MAX_THINKING_TOKENS=0` |
+| `claude-sonnet-5-5` | 1,024        | Cannot be turned off. No `thinking` field is sent; effort is `low`, the lowest | `CLAUDE_CODE_EFFORT_LEVEL=low`                           |
+| `claude-opus-5-5`   | 1,024        | Cannot be turned off. No `thinking` field is sent; effort is `low`, the lowest | `CLAUDE_CODE_EFFORT_LEVEL=low`                           |
+
+All three models answered `dev-math-01` correctly under these settings, which also confirms that the Pro plan can use Opus 5.5, Sonnet 5.5, and Haiku 4.5 through this backend.
+
+**What is still different after that change.**
+
+1. **Opus 5.5 and Sonnet 5.5 still think.** Anthropic does not allow thinking to be disabled on them. They run at the lowest effort. Haiku 4.5 does not think.
+2. **Two system-prompt blocks and three reminder blocks are added** (table below). No setting removes them on a subscription login.
+3. **Each request carries about 1,450 input tokens of fixed overhead** (the tool-use preamble, five tool schemas, and the added blocks).
+4. **Prompt caching is on**, with a one-hour lifetime. The first request of a run can be priced, at reference rates, as a cache write.
+5. **Tools are named `mcp__arena__<name>`** in the request.
+6. **The trace's input preview shows our system prompt and the task**, not the added blocks.
+
+The captured requests are in `docs/findings/claude-agent-sdk-request/`, one per model.
+
+**What each request contains besides our prompt and tools.**
+
+| Where                  | What Claude Code adds                                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| System prompt, block 1 | A billing header line: `x-anthropic-billing-header: cc_version=…; cc_entrypoint=sdk-py; …`                                                                                                                                                                  |
+| System prompt, block 2 | "You are a Claude agent, built on Anthropic's Claude Agent SDK."                                                                                                                                                                                            |
+| System prompt, block 3 | Our prompt, unchanged                                                                                                                                                                                                                                       |
+| First user message     | Three `<system-reminder>` blocks before the task: the environment (working directory, platform, OS version), the model's name and knowledge cutoff, and today's date                                                                                        |
+| Tools                  | Ours only, named `mcp__arena__<name>`                                                                                                                                                                                                                       |
+| Request settings       | As first observed: `max_tokens: 32000` and extended thinking with a 31,999-token budget. Both are now overridden (table above). Still set by Claude Code: prompt caching with a one-hour lifetime, and a context-management rule that keeps thinking blocks |
 
 `CLAUDE_CODE_DISABLE_ATTACHMENTS` did not remove the three reminders. The only mode that drops them does not accept a subscription token.
 
-**Differences from the LiteLLM backend that follow from this.**
-
-1. **The per-call completion cap is not applied.** Gemini and Groq calls are capped at 1,024 completion tokens; Claude Code sends 32,000 and enables thinking. The per-run token cap, the step limit, the tool-output cap, and the time limit are enforced identically, by the shared counters.
-2. **Thinking is on for every Claude model, including Haiku**, because Claude Code turns it on. The configs still set no effort or thinking option.
-3. **Each request carries about 1,600 input tokens of fixed overhead** (the tool-use preamble, five tool schemas, and the reminders), so a three-step run used about 6,000 tokens against about 1,900 on Groq. The 16,000-token run cap therefore binds sooner for Claude configs.
-4. **The trace's input preview shows our system prompt and the task**, not the harness's additions. They are documented here and on `/about`.
-
 **Tool timing.** Claude Code can start a tool before the model response has finished streaming. The backend holds each tool, in the `PreToolUse` hook, until that response is recorded, so trace events stay in order.
 
-**Development calls.** Building this used two real sessions on the subscription before the smoke run: one probe of the SDK's event order (two Haiku requests) and the smoke run itself (three Haiku requests).
+**Subscription usage for this phase.** Twelve requests in total: a probe of the SDK's event order (two Haiku requests), the smoke run (three Haiku), and one verification run per model after the settings change (four Haiku, two Sonnet, one Opus).

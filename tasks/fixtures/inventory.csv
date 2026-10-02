@@ -1,0 +1,25 @@
+sku,name,category,stock,reorder_point,unit_cost
+SKU-001,anchor bolt,fasteners,3,20,46.88
+SKU-002,hex nut,fasteners,35,40,32.63
+SKU-003,lock washer,fasteners,30,20,9.32
+SKU-004,rivet,fasteners,76,40,22.54
+SKU-005,wood screw,fasteners,6,20,15.73
+SKU-006,toggle,fasteners,17,20,24.89
+SKU-007,brass hinge,hardware,9,20,39.91
+SKU-008,door stop,hardware,4,10,26.32
+SKU-009,drawer slide,hardware,23,20,57.91
+SKU-010,gate latch,hardware,17,20,52.40
+SKU-011,hasp,hardware,88,40,23.12
+SKU-012,pull,hardware,35,25,55.68
+SKU-013,cable reel,electrical,2,25,55.57
+SKU-014,junction box,electrical,85,50,36.82
+SKU-015,wire nut,electrical,18,20,33.87
+SKU-016,conduit,electrical,110,50,7.67
+SKU-017,breaker,electrical,22,20,59.58
+SKU-018,relay,electrical,56,25,43.19
+SKU-019,drill bit set,tools,3,25,13.29
+SKU-020,hole saw,tools,149,50,19.95
+SKU-021,level,tools,78,50,31.26
+SKU-022,pry bar,tools,72,25,55.68
+SKU-023,tape measure,tools,60,40,33.70
+SKU-024,vise,tools,75,50,46.59

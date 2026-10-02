@@ -1,0 +1,21 @@
+id: math-06
+title: "Filling a tank with a leak"
+category: math
+difficulty: hard
+prompt: |
+  Pipe A fills a tank in 6 hours and pipe B fills it in 9 hours. A drain empties the full tank in 12 hours. With both pipes and the drain open, how many hours does it take to fill the empty tank?
+  Answer with the number only, to two decimal places.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 5.14
+  tolerance: 0.01
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "5.14"
+    - "5.14 hours"
+  wrong:
+    - "3.60"
+    - "5"
+    - "3.27"

@@ -1,0 +1,22 @@
+id: math-03
+title: "Average speed over two legs"
+category: math
+difficulty: medium
+prompt: |
+  A cyclist rides 18 km at 24 km/h and then 27 km at 18 km/h. What is the average speed for the whole trip, in km/h?
+  Answer with the number only, to two decimal places.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 20.0
+  tolerance: 0.01
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "20.00"
+    - "20"
+    - "20.0 km/h"
+  wrong:
+    - "21.00"
+    - "20.4"
+    - "21"

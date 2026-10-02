@@ -53,7 +53,16 @@ HARNESS_ENV = {
     "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "DISABLE_AUTOUPDATER": "1",
+    # Claude Code turns extended thinking on by itself. The other backends set no
+    # reasoning options, so thinking is turned off where the model allows it and
+    # set to the lowest effort where it does not (Opus 5.5 and Sonnet 5.5 cannot
+    # have thinking turned off).
+    "MAX_THINKING_TOKENS": "0",
+    "CLAUDE_CODE_EFFORT_LEVEL": "low",
 }
+# Claude Code's own default is 32,000 output tokens per call. This variable carries
+# the same per-call cap the LiteLLM backend passes as max_tokens.
+MAX_OUTPUT_VARIABLE = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"
 
 Hook = Callable[[dict[str, Any], str | None, Any], Any]
 ToolHandler = Callable[[dict[str, Any]], Any]
@@ -377,8 +386,9 @@ class AgentSdkBackend:
         # Checked here as well as in run(): a refusal should come before the run starts.
         check_environment(self._env)
 
-    def _harness_env(self, config_dir: Path) -> dict[str, str]:
+    def _harness_env(self, config_dir: Path, max_completion_tokens: int) -> dict[str, str]:
         env = dict(HARNESS_ENV)
+        env[MAX_OUTPUT_VARIABLE] = str(max_completion_tokens)
         # A throwaway config folder: the session reads and leaves nothing behind.
         env["CLAUDE_CONFIG_DIR"] = str(config_dir)
         if self._raw_request_dir is not None:
@@ -409,7 +419,7 @@ class AgentSdkBackend:
             tools=tools,
             pre_tool_use=session.pre_tool_use,
             post_tool_use=session.post_tool_use,
-            env=self._harness_env(workdir / "config"),
+            env=self._harness_env(workdir / "config", ctx.limits.max_completion_tokens),
             cwd=workdir,
         )
         try:

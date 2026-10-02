@@ -15,7 +15,7 @@ from arena.tools.base import ToolResult, string_argument
 
 K1 = 1.5
 B = 0.75
-TOP_K = 3
+TOP_K = 5
 _WORD = re.compile(r"[a-z0-9]+")
 
 

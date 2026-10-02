@@ -1,0 +1,23 @@
+id: data-08
+title: "Top three items by stock value"
+category: data_analysis
+difficulty: hard
+prompt: |
+  Using inventory.csv in the fixtures folder (columns: sku, name, category, stock, reorder_point, unit_cost), the stock value of an item is stock times unit_cost. Which three items have the highest stock value?
+  Answer with the three SKUs only, highest first, separated by commas. For example: SKU-001, SKU-002, SKU-003
+required_tools: [python_exec]
+scorer_type: python_check
+scorer_config:
+  checker: "top_three_skus"
+  expected: ["SKU-022", "SKU-024", "SKU-014"]
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "SKU-022, SKU-024, SKU-014"
+    - "sku-022,sku-024,sku-014"
+    - "SKU-022, SKU-024, SKU-014."
+  wrong:
+    - "SKU-024, SKU-022, SKU-014"
+    - "SKU-022, SKU-024"
+    - "SKU-022, SKU-024, SKU-020"
+    - "pry bar, vise, junction box"

@@ -1,0 +1,21 @@
+id: trap-02
+title: "A Fibonacci number"
+category: tool_trap
+difficulty: medium
+prompt: |
+  In the Fibonacci sequence that starts 1, 1, 2, 3, 5, what is the 30th number?
+  Answer with the number only.
+required_tools: [python_exec]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 832040
+  tolerance: 0
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "832040"
+    - "832,040"
+  wrong:
+    - "514229"
+    - "1346269"
+    - "832000"

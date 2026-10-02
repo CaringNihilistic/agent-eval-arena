@@ -10,7 +10,8 @@ import typer
 
 from arena.backends.base import BackendUnavailableError
 from arena.backends.claude_auth import SubscriptionAuthError
-from arena.config import load_config, load_configs, load_tasks
+from arena.config import AgentConfig, Task, load_bank, load_config, load_configs, load_tasks
+from arena.evaluation import HEADER, evaluate, format_row, summarise
 from arena.events import Event
 from arena.llm import LiteLLMClient
 from arena.pricing import ModelNotAllowedError
@@ -63,6 +64,9 @@ def describe(event: Event) -> str:
                 f"{payload['latency_ms']} ms active, ${payload['cost_usd']:.4f} actual, "
                 f"${payload['reference_cost_usd']:.6f} at paid rates"
             )
+        case "score_computed":
+            verdict = "PASS" if payload["passed"] else "FAIL"
+            detail = f"{verdict} ({payload['scorer_type']}): {payload['explanation']}"
         case "error":
             detail = payload["message"]
         case _:
@@ -102,14 +106,7 @@ def run(
         typer.echo(f"No task with id {task!r}. Known tasks: {', '.join(sorted(tasks))}", err=True)
         raise typer.Exit(2)
 
-    key_name = PROVIDER_KEYS.get(agent_config.provider)
-    if key_name is not None and not os.environ.get(key_name):
-        typer.echo(
-            f"{key_name} is not set. Add it to .env (see .env.example) and restart the api "
-            "container.",
-            err=True,
-        )
-        raise typer.Exit(2)
+    _check_provider_key(agent_config)
 
     def show(event: Event) -> None:
         typer.echo(json.dumps(event) if as_json else describe(event))
@@ -150,6 +147,70 @@ def run(
             err=True,
         )
         raise typer.Exit(4)
+
+
+def _check_provider_key(agent_config: AgentConfig) -> None:
+    key_name = PROVIDER_KEYS.get(agent_config.provider)
+    if key_name is not None and not os.environ.get(key_name):
+        typer.echo(
+            f"{key_name} is not set. Add it to .env (see .env.example) and restart the api "
+            "container.",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+
+@app.command(name="eval")
+def eval_config(
+    config: Annotated[str, typer.Option(help="Config name, for example qwen-full")],
+    category: Annotated[
+        str | None,
+        typer.Option(help="Only this category: math, data_analysis, multi_hop, tool_trap"),
+    ] = None,
+    task: Annotated[list[str] | None, typer.Option(help="Only these task ids (repeatable)")] = None,
+    include_dev: Annotated[
+        bool, typer.Option("--include-dev", help="Also run the development tasks")
+    ] = False,
+    delay: Annotated[
+        float, typer.Option(help="Seconds to wait between runs, for free-tier rate limits")
+    ] = 0.0,
+) -> None:
+    """Run one config across the task bank and print a results table.
+
+    Every run is a real model call on a free tier or the subscription.
+    """
+    settings = get_settings()
+    try:
+        agent_config = load_config(settings.configs_dir, config)
+    except FileNotFoundError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(2) from error
+    available = load_tasks(settings.tasks_dir) if include_dev else load_bank(settings.tasks_dir)
+    chosen: list[Task] = [
+        item
+        for item in available.values()
+        if (category is None or item.category == category) and (not task or item.id in task)
+    ]
+    if not chosen:
+        typer.echo("No task matches that selection.", err=True)
+        raise typer.Exit(2)
+    _check_provider_key(agent_config)
+    llm = LiteLLMClient() if agent_config.backend == "litellm" else None
+
+    async def run_one(item: Task) -> RunResult:
+        return await run_agent(agent_config, item, llm=llm, settings=settings)
+
+    typer.echo(f"{agent_config.id} ({agent_config.model}) on {len(chosen)} tasks")
+    typer.echo(HEADER)
+    try:
+        rows = asyncio.run(
+            evaluate(chosen, run_one, delay_s=delay, on_row=lambda row: typer.echo(format_row(row)))
+        )
+    except (ModelNotAllowedError, BackendUnavailableError, SubscriptionAuthError) as error:
+        typer.echo(f"Refused: {error}", err=True)
+        raise typer.Exit(3) from error
+    for line in summarise(rows):
+        typer.echo(line)
 
 
 @app.command(name="list")

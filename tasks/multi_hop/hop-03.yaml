@@ -1,0 +1,20 @@
+id: hop-03
+title: "Mayor of the museum's town"
+category: multi_hop
+difficulty: easy
+prompt: |
+  Who is the mayor of the town where the Maritime Museum is located?
+  Answer with the person's full name only.
+required_tools: [search_docs]
+scorer_type: exact
+scorer_config:
+  expected: "Helena Voss"
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Helena Voss"
+    - "helena voss."
+  wrong:
+    - "Tobias Renner"
+    - "Daniel Abara"
+    - "Voss"

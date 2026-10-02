@@ -11,3 +11,10 @@ scorer_type: numeric_tolerance
 scorer_config:
   expected: 313.03
   tolerance: 0.01
+examples:
+  correct:
+    - "313.03"
+    - "$313.03"
+  wrong:
+    - "340.25"
+    - "313"

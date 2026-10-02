@@ -1,0 +1,21 @@
+id: math-04
+title: "Chained percentage changes"
+category: math
+difficulty: easy
+prompt: |
+  An item is listed at $260. The price is raised by 15%, then that new price is cut by 20%, and finally 8.5% sales tax is added. What is the final price in dollars?
+  Answer with the number only, to two decimal places.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 259.53
+  tolerance: 0.01
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "259.53"
+    - "$259.53"
+  wrong:
+    - "268.06"
+    - "239.20"
+    - "260.00"

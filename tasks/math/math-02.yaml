@@ -1,0 +1,21 @@
+id: math-02
+title: "Monthly compounding"
+category: math
+difficulty: medium
+prompt: |
+  A deposit of $4,200 earns 3.6% annual interest, compounded monthly. What is the balance after 30 months, in dollars?
+  Answer with the number only, to two decimal places.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 4594.91
+  tolerance: 0.01
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "4594.91"
+    - "$4,594.91"
+  wrong:
+    - "4578.00"
+    - "4588.02"
+    - "394.91"

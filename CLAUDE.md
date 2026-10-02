@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current phase: 2b (Claude subscription backend) complete, awaiting go-ahead for Phase 3 (task bank and scorers). The five-run Claude usage pilot follows Phase 3.** Update this line at the end of every phase.
+**Current phase: 3 (task bank and scorers) complete. Next: the five-run Claude usage pilot, then Phase 4. An open decision on replacing the Gemini pair with gpt-oss-20b is with the owner.** Update this line at the end of every phase.
 
 ## How we work
 
@@ -67,11 +67,12 @@ pnpm schema:gen                        # regenerate TS and Pydantic types from t
 pnpm schema:check                      # fail if generated types are stale
 node scripts/py.mjs api <cmd>          # any uv-run command in the api container
 docker compose exec api uv run arena list
+docker compose exec api uv run arena eval --config qwen-full --delay 45   # real runs over the 30-task bank
 docker compose exec api uv run arena run --config qwen-full --task dev-math-01
 docker compose exec api uv run arena run --config claude-haiku-full --task dev-math-01   # uses the subscription
 ```
 
-Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `arena export` (Phase 4), `arena record --pilot` (Phase 8).
+Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena export` (Phase 4), `arena record --pilot` (Phase 8).
 
 ## Where things are (backend)
 
@@ -85,7 +86,8 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `
 - `apps/api/tests/recorded/`: responses real providers returned, used as regression fixtures. When a real run breaks, save the response there (`arena run --dump-raw`) and write the test from it.
 - `apps/sandbox/src/sandbox/executor.py`: sandboxed execution. Its tests are escape attempts and must run inside the sandbox container.
 - `apps/web/src/lib/blind-view.ts`: the only redaction code. `apps/web/src/test/leak-scan.ts` is the check every blind response must pass.
-- `configs/`, `tasks/`: agent configs, prompts, tasks, fixtures, corpus.
+- `apps/api/src/arena/scoring.py`: the five scorers. `apps/api/tests/test_task_bank.py` re-derives every expected answer; a new task needs an entry there.
+- `configs/`, `tasks/`: agent configs, prompts, tasks, fixtures, corpus, checkers. `tasks/tools/make_fixtures.py` regenerates the fixtures.
 
 ## Rules
 
@@ -100,7 +102,8 @@ Planned, not yet available: `pnpm test:e2e` (Phase 9), `arena eval` (Phase 3), `
 
 - Prefer deterministic scorers. `llm_judge` only where unavoidable, with the judge's reasoning in `score_computed.explanation`.
 - The judge model must not share a model family with any contestant config. The recorded task bank uses deterministic scorers only.
-- Never send `scorer_config` (expected answers, checker code) to the browser.
+- Never send `scorer_config` or `examples` (expected answers, checker code) to the browser. `Task.public()` is the only view of a task that may leave the backend.
+- Each task file carries known-correct and known-wrong answers under `examples`, and every prompt ends by saying exactly what form the answer takes.
 - No placeholder logic or fake data in production paths. If something is stubbed, mark it `TODO(phase-N)` and mention it in the phase report.
 - Results in the README are measured numbers from recorded runs, never illustrative ones.
 

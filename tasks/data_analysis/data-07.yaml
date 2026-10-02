@@ -1,0 +1,21 @@
+id: data-07
+title: "Mean without a faulty reading"
+category: data_analysis
+difficulty: hard
+prompt: |
+  In sensor_readings.csv in the fixtures folder (columns: timestamp, sensor, temperature_c, humidity_pct), sensor A has one faulty reading above 60 degrees, and some readings are blank. What is the mean temperature of sensor A, leaving out the blank readings and the faulty one?
+  Answer with the number only, to two decimal places.
+required_tools: [python_exec]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 19.51
+  tolerance: 0.01
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "19.51"
+    - "19.51 degrees"
+  wrong:
+    - "21.21"
+    - "19.7"
+    - "18.7"

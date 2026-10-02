@@ -1,0 +1,21 @@
+id: math-08
+title: "Score needed on the final"
+category: math
+difficulty: medium
+prompt: |
+  A course grade is 20% homework, 30% midterm, and 50% final exam. A student has a homework average of 88 and a midterm score of 74. What score on the final exam gives an overall grade of exactly 80?
+  Answer with the number only, to one decimal place.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 80.4
+  tolerance: 0.05
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "80.4"
+    - "80.40"
+  wrong:
+    - "80"
+    - "78"
+    - "81.0"

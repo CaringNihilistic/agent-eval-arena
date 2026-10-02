@@ -1,0 +1,21 @@
+id: hop-05
+title: "Combined ferry capacity"
+category: multi_hop
+difficulty: medium
+prompt: |
+  How many passengers can all the vessels of the Harbor Ferry fleet carry together?
+  Answer with the number only.
+required_tools: [search_docs, calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 790
+  tolerance: 0
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "790"
+    - "790 passengers"
+  wrong:
+    - "550"
+    - "310"
+    - "720"

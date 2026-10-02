@@ -1,0 +1,22 @@
+id: trap-06
+title: "Track length in feet"
+category: tool_trap
+difficulty: medium
+prompt: |
+  How long is the track of the Ridge Line funicular in feet? Use 1 metre = 3.28084 feet.
+  Answer with the number only, rounded to the nearest whole foot.
+required_tools: [search_docs, calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 2008
+  tolerance: 0.5
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "2008"
+    - "2,008 feet"
+    - "2007.87"
+  wrong:
+    - "612"
+    - "486"
+    - "2000"

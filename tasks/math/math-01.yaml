@@ -1,0 +1,22 @@
+id: math-01
+title: "Tiered printing price"
+category: math
+difficulty: easy
+prompt: |
+  A print shop charges $0.12 per page for the first 500 pages of a job and $0.09 per page after that. A job has 1,840 pages and also carries a $7.50 binding fee. What is the total price in dollars?
+  Answer with the number only, to two decimal places.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 188.1
+  tolerance: 0.01
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "188.10"
+    - "$188.10"
+    - "188.1"
+  wrong:
+    - "228.30"
+    - "180.60"
+    - "188"

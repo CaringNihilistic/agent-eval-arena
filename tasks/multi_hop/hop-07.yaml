@@ -1,0 +1,21 @@
+id: hop-07
+title: "Funicular and observatory"
+category: multi_hop
+difficulty: hard
+prompt: |
+  How many years passed between the opening of the Ridge Line funicular and the opening of the observatory in the village at its upper station?
+  Answer with the number only.
+required_tools: [search_docs, calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 14
+  tolerance: 0
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "14"
+    - "14 years"
+  wrong:
+    - "1968"
+    - "22"
+    - "108"

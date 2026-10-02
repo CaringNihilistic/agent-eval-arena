@@ -9,3 +9,10 @@ required_tools: [search_docs]
 scorer_type: exact
 scorer_config:
   expected: Imani Okafor
+examples:
+  correct:
+    - "Imani Okafor"
+    - "imani okafor."
+  wrong:
+    - "Rafael Lindqvist"
+    - "Okafor"

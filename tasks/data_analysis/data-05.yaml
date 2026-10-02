@@ -1,0 +1,20 @@
+id: data-05
+title: "Busiest month for orders"
+category: data_analysis
+difficulty: medium
+prompt: |
+  Using orders.csv in the fixtures folder, in which month were the most orders placed, counting orders of every status? The order_date column has the form YYYY-MM-DD.
+  Answer with the month only, in the form YYYY-MM.
+required_tools: [python_exec]
+scorer_type: exact
+scorer_config:
+  expected: "2026-05"
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "2026-05"
+    - "2026-05."
+  wrong:
+    - "2026-06"
+    - "May"
+    - "05"

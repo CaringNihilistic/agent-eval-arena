@@ -183,7 +183,7 @@ async def test_stops_at_max_steps_without_an_extra_model_call(tmp_path: Path) ->
     assert result.stop_reason == "max_steps"
     assert result.steps == 3
     assert harness.model_calls == 3
-    assert types(result)[-1] == "run_finished"
+    assert types(result)[-2:] == ["run_finished", "score_computed"]
 
 
 async def test_stops_at_the_token_limit_and_does_not_run_the_tool(tmp_path: Path) -> None:
@@ -305,9 +305,22 @@ async def test_the_session_is_asked_for_only_our_prompt_and_tools(tmp_path: Path
     assert client.prompt == fakes.make_task().prompt
     assert list(spec.tools) == ["calculator", "read_file", "submit_answer"]
     assert spec.env["ENABLE_TOOL_SEARCH"] == "false"
+    # Claude Code's own defaults are 32,000 output tokens and thinking on.
+    assert spec.env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == str(RunLimits().max_completion_tokens)
+    assert spec.env["MAX_THINKING_TOKENS"] == "0"
+    assert spec.env["CLAUDE_CODE_EFFORT_LEVEL"] == "low"
     assert set(HARNESS_ENV) <= set(spec.env)
     assert not set(spec.env) & set(FORBIDDEN_VARIABLES)
     assert TOKEN_VARIABLE not in spec.env
+
+
+async def test_the_per_call_output_cap_is_the_shared_limit(tmp_path: Path) -> None:
+    harness = Harness([submits("1")])
+
+    await run(tmp_path, harness, limits=RunLimits(max_completion_tokens=512))
+
+    assert harness.spec is not None
+    assert harness.spec.env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "512"
 
 
 async def test_the_real_client_is_built_with_no_built_in_tools_and_no_settings(

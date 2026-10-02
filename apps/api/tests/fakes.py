@@ -154,6 +154,7 @@ def make_task(**overrides: object) -> Task:
         "required_tools": ["calculator"],
         "scorer_type": "exact",
         "scorer_config": {"expected": "42"},
+        "examples": {"correct": ["42"], "wrong": ["41"]},
     }
     return Task.model_validate({**fields, **overrides})
 

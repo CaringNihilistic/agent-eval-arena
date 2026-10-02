@@ -1,0 +1,21 @@
+id: trap-04
+title: "Two things called Kestrel"
+category: tool_trap
+difficulty: easy
+prompt: |
+  How tall is the lighthouse at Kestrel Point, in metres?
+  Answer with the number only.
+required_tools: [search_docs]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 34
+  tolerance: 0
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "34"
+    - "34 metres"
+  wrong:
+    - "310"
+    - "19"
+    - "4"

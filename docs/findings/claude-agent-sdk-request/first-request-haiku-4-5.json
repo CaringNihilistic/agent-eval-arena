@@ -6,7 +6,7 @@
       "content": [
         {
           "type": "text",
-          "text": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /tmp/arena-claude-igp9cp4y\n - Is a git repository: false\n - Platform: linux\n - Shell: unknown\n - OS Version: Linux 6.6.114.1-microsoft-standard-WSL2\n</system-reminder>"
+          "text": "<system-reminder>\n# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /tmp/arena-claude-4jnb7rpg\n - Is a git repository: false\n - Platform: linux\n - Shell: unknown\n - OS Version: Linux 6.6.114.1-microsoft-standard-WSL2\n</system-reminder>"
         },
         {
           "type": "text",
@@ -30,7 +30,7 @@
   "system": [
     {
       "type": "text",
-      "text": "x-anthropic-billing-header: cc_version=2.1.286.b26; cc_entrypoint=sdk-py; cch=00000; cc_prompt_id=33235db0-7d10-4a75-9e95-4ecda3df4437; cc_turn_origin=sdk; cc_prompt_index=0; cc_turn_index=1;"
+      "text": "x-anthropic-billing-header: cc_version=2.1.286.b26; cc_entrypoint=sdk-py; cch=00000; cc_prompt_id=6a75870f-06c9-45fe-b754-c9a4da9a501c; cc_turn_origin=sdk; cc_prompt_index=0; cc_turn_index=1;"
     },
     {
       "type": "text",
@@ -138,28 +138,17 @@
     "context-management-2025-06-27",
     "prompt-caching-scope-2026-01-05",
     "claude-code-20250219",
-    "thinking-binding-controls-2026-08-01",
-    "thinking-display-updates-2026-08-18",
     "extended-cache-ttl-2025-04-11",
     "cache-diagnosis-2026-04-07"
   ],
   "metadata": {
     "user_id": "<removed>"
   },
-  "max_tokens": 32000,
+  "max_tokens": 1024,
   "thinking": {
-    "budget_tokens": 31999,
-    "type": "enabled",
-    "display": "updates"
+    "type": "disabled"
   },
-  "context_management": {
-    "edits": [
-      {
-        "type": "clear_thinking_20251015",
-        "keep": "all"
-      }
-    ]
-  },
+  "temperature": 1,
   "diagnostics": {
     "previous_message_id": null
   },

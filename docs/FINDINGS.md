@@ -55,17 +55,48 @@ Groq rejects the whole response with HTTP 400, code `tool_use_failed`, message "
 
 ## 5. The Claude Agent SDK adds context and settings of its own (README)
 
-**Observed 2026-10-02**, Claude Agent SDK 0.2.163, Claude Code 2.1.286, model `claude-haiku-4-5`, subscription login.
+**Observed 2026-10-02**, Claude Agent SDK 0.2.163, Claude Code 2.1.286, subscription login.
 
-With a custom system prompt, every built-in tool removed, and no settings loaded, each request still carries:
+With a custom system prompt, every built-in tool removed, and no settings loaded, each request still carried:
 
 - two extra system-prompt blocks ahead of ours: a billing header line, and "You are a Claude agent, built on Anthropic's Claude Agent SDK.";
 - three `<system-reminder>` blocks ahead of the task: the environment, the model's name and knowledge cutoff, and today's date;
-- extended thinking enabled with a 31,999-token budget and `max_tokens` of 32,000, on every model including Haiku;
+- `max_tokens` of 32,000 and extended thinking with a 31,999-token budget, on every model including Haiku;
 - prompt caching with a one-hour lifetime.
 
 The tools are exactly ours, renamed `mcp__arena__<name>`.
 
-**Consequence.** Claude configs do not run under the same request settings as the Gemini and Groq configs: they think, they are not capped at 1,024 completion tokens per call, and each request has about 1,600 tokens of fixed input overhead. This is part of the loop confound between backends and is why matches and the Elo board are kept within a backend.
+**What could be brought in line.** The arena now sets `max_tokens` to 1,024, the same per-call cap the other configs have, and turns thinking off on Haiku 4.5. A fresh captured request per model confirms both.
 
-**Evidence.** `docs/findings/claude-agent-sdk-request/first-request.json` is the first request of the smoke run, with the account identifier removed.
+**What could not.**
+
+- **Opus 5.5 and Sonnet 5.5 cannot have thinking turned off.** They run at the lowest effort setting instead, so they still reason before answering and Haiku does not.
+- **The added system-prompt and reminder blocks stay.** No setting removes them on a subscription login.
+- **About 1,450 input tokens of fixed overhead per request**, mostly the tool-use preamble and tool schemas.
+- **Prompt caching stays on.**
+
+**Consequence.** Claude configs do not run under identical request conditions to the Gemini and Qwen configs. This is part of the loop confound between backends and is why matches and the Elo board are kept within a backend. For `/about`: say that Claude configs run Claude Code's loop, list the four differences above, and link to the captured requests.
+
+**Evidence.** `docs/findings/claude-agent-sdk-request/` holds the first request of a run for each of the three models, with the account identifier removed.
+
+## 6. No free Gemini model offers more than 20 requests a day to this account
+
+**Observed 2026-10-02.**
+
+| Model                                       | Result                                                                                                                                                                                                                        |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gemini-3.8-flash`                          | 20 requests a day (owner's AI Studio page). Tool calls work.                                                                                                                                                                  |
+| `gemini-3.5-flash`                          | 20 requests: the API's 429 reads "Quota exceeded for metric: generate_content_free_tier_requests, limit: 20". Tool calls work; it passed two development tasks before the quota ran out. Requests took 10 to 15 seconds each. |
+| `gemini-3.7-flash`                          | Passed the one task it was run on. Its limit is visible only in AI Studio.                                                                                                                                                    |
+| `gemini-3.6-flash`                          | Not run to completion. Its limit is visible only in AI Studio.                                                                                                                                                                |
+| `gemini-2.5-flash`, `gemini-2.5-flash-lite` | HTTP 404: "no longer available to new users".                                                                                                                                                                                 |
+
+Requests refused with HTTP 503 appear to count against the daily quota: `gemini-3.5-flash` reported its 20-request limit reached after about ten served requests and several refused ones.
+
+## 7. gpt-oss-20b uses the code tool that gpt-oss-120b cannot
+
+**Observed 2026-10-02**, `groq/openai/gpt-oss-20b`, Groq free plan. On the same code task where gpt-oss-120b calls its built-in `python` tool every time (entry 1), the 20b model called `python_exec` with valid arguments and answered correctly. It is less steady in other ways: one run produced a malformed tool name (`submit_answer<|channel|>commentar…`), which Groq rejected and the arena's recovery handled, and one run wandered for seven steps until it hit the per-minute token limit.
+
+## 8. One run can exceed Groq's per-minute limit by itself
+
+**Observed 2026-10-02**, `groq/qwen/qwen3.8-27b`. A single four-step run used 7,230 tokens, over the 7,000 input tokens a minute Groq enforces, and was cut off even with 45 seconds between runs. Spacing runs apart is not enough: the recorder has to pace individual model calls.

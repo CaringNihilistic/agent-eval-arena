@@ -1,0 +1,23 @@
+id: hop-08
+title: "A beer and a boat"
+category: multi_hop
+difficulty: medium
+prompt: |
+  The newest vessel of the Harbor Ferry is named after a bird. Which beer of the Pinecrest Brewing Cooperative is named after the same bird?
+  Answer with the name of the beer only.
+required_tools: [search_docs]
+scorer_type: regex
+scorer_config:
+  pattern: "(the )?kestrel amber( ale| beer)?"
+  case_insensitive: true
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "Kestrel Amber"
+    - "kestrel amber."
+    - "Kestrel Amber Ale"
+  wrong:
+    - "Kestrel"
+    - "Saltmarsh Stout"
+    - "Regatta Pale"
+    - "Amber"

@@ -13,7 +13,9 @@ Category = Literal["math", "data_analysis", "multi_hop", "tool_trap"]
 ScorerType = Literal["exact", "numeric_tolerance", "regex", "python_check", "llm_judge"]
 
 # Folders under tasks/ that hold data for tasks, not task definitions.
-NON_TASK_DIRS = {"fixtures", "corpus", "checkers"}
+NON_TASK_DIRS = {"fixtures", "corpus", "checkers", "tools"}
+# Tasks here exercise the runner during development and are not recorded.
+DEV_DIR = "dev"
 
 
 class AgentConfig(BaseModel):
@@ -53,6 +55,15 @@ class AgentConfig(BaseModel):
         }
 
 
+class TaskExamples(BaseModel):
+    """Answers the task's scorer must accept and reject. Used by the tests."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    correct: list[str] = Field(min_length=1)
+    wrong: list[str] = Field(min_length=1)
+
+
 class Task(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -64,6 +75,21 @@ class Task(BaseModel):
     required_tools: list[ToolName]
     scorer_type: ScorerType
     scorer_config: dict[str, Any]
+    examples: TaskExamples
+    # False for development tasks, which are not part of the recorded bank.
+    # Set from the file's folder, never from the YAML.
+    in_bank: bool = True
+
+    def public(self) -> dict[str, Any]:
+        """What may be shown to anyone. Never the expected answer or the examples."""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "category": self.category,
+            "difficulty": self.difficulty,
+            "prompt": self.prompt,
+            "required_tools": list(self.required_tools),
+        }
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -94,8 +120,17 @@ def load_tasks(tasks_dir: Path) -> dict[str, Task]:
     for path in sorted(tasks_dir.rglob("*.yaml")):
         if NON_TASK_DIRS.intersection(path.relative_to(tasks_dir).parts):
             continue
-        task = Task.model_validate(_read_yaml(path))
+        data = _read_yaml(path)
+        if "in_bank" in data:
+            raise ValueError(f"{path} must not set in_bank; it comes from the folder")
+        parts = path.relative_to(tasks_dir).parts
+        task = Task.model_validate({**data, "in_bank": DEV_DIR not in parts})
         if task.id in tasks:
             raise ValueError(f"Duplicate task id {task.id!r} in {path}")
         tasks[task.id] = task
     return tasks
+
+
+def load_bank(tasks_dir: Path) -> dict[str, Task]:
+    """The tasks that are recorded and scored for the leaderboards."""
+    return {task_id: task for task_id, task in load_tasks(tasks_dir).items() if task.in_bank}

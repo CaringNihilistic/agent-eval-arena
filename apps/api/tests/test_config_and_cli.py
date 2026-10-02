@@ -61,6 +61,7 @@ def test_duplicate_task_ids_are_rejected(tmp_path: Path) -> None:
     body = (
         "id: same\ntitle: t\ncategory: math\ndifficulty: easy\nprompt: p\n"
         "required_tools: []\nscorer_type: exact\nscorer_config: {expected: x}\n"
+        "examples: {correct: [x], wrong: [y]}\n"
     )
     (tmp_path / "a.yaml").write_text(body, encoding="utf-8")
     (tmp_path / "b.yaml").write_text(body, encoding="utf-8")

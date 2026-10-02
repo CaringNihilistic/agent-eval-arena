@@ -1,0 +1,22 @@
+id: data-03
+title: "Median salary in a department"
+category: data_analysis
+difficulty: medium
+prompt: |
+  The file employees.csv in the fixtures folder has the columns employee_id, name, department, salary, start_date, manager_id. What is the median salary in the Engineering department?
+  Answer with the number only.
+required_tools: [python_exec]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 100000
+  tolerance: 0.5
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "100000"
+    - "100,000"
+    - "$100,000.00"
+  wrong:
+    - "101142.86"
+    - "126250"
+    - "77750"

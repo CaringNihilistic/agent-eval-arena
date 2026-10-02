@@ -1,0 +1,22 @@
+id: math-07
+title: "Volume of a partly filled tank"
+category: math
+difficulty: medium
+prompt: |
+  A cylindrical tank has a radius of 1.4 m and a height of 3.2 m. It is filled to 65% of its height. How many litres of water does it hold? One cubic metre is 1,000 litres. Use the calculator's value of pi.
+  Answer with the number only, rounded to the nearest litre.
+required_tools: [calculator]
+scorer_type: numeric_tolerance
+scorer_config:
+  expected: 12808
+  tolerance: 1
+# Answers the scorer must accept and reject. Used only by the tests.
+examples:
+  correct:
+    - "12808"
+    - "12,808"
+    - "12807.5"
+  wrong:
+    - "19704"
+    - "12800"
+    - "12.808"

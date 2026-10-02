@@ -15,6 +15,7 @@ from arena.events import Emitter, Event, Sink
 from arena.llm import LLMClient
 from arena.pricing import PricingTable, assert_runnable, default_pricing
 from arena.run_context import RunContext, RunLimits, StopReason
+from arena.scoring import ScoringError, score_answer
 from arena.settings import Settings
 from arena.tools.registry import build_tools
 
@@ -40,6 +41,10 @@ class RunResult:
     # Backend facts that are not part of the trace, such as the SDK's own cost estimate.
     backend_info: dict[str, Any] = field(default_factory=dict)
     usage_limit_resets_at: int | None = None
+    # None when the run was not scored: abandoned, scoring switched off, or the scorer failed.
+    passed: bool | None = None
+    score: float | None = None
+    score_explanation: str | None = None
 
     @property
     def total_tokens(self) -> int:
@@ -73,6 +78,7 @@ async def run_agent(
     sink: Sink | None = None,
     backend: AgentBackend | None = None,
     raw_request_dir: Path | None = None,
+    score: bool = True,
 ) -> RunResult:
     """Run `config` on `task`. Raises ModelNotAllowedError before any model call
     if the model is not marked free or subscription."""
@@ -131,6 +137,34 @@ async def run_agent(
             "stop_reason": stop_reason,
         },
     )
+    passed: bool | None = None
+    points: float | None = None
+    explanation: str | None = None
+    # A run the provider cut short is re-run, so it is not scored.
+    if score and not ctx.abandoned:
+        try:
+            verdict = await score_answer(
+                task,
+                ctx.final_answer,
+                settings=settings,
+                llm=llm,
+                contestant_families={config.model_family},
+                pricing=pricing,
+            )
+        except ScoringError as error:
+            ctx.error(f"the answer could not be scored: {error}", recoverable=True)
+        else:
+            passed, points, explanation = verdict.passed, verdict.score, verdict.explanation
+            ctx.emitter.emit(
+                "score_computed",
+                {
+                    "passed": verdict.passed,
+                    "score": verdict.score,
+                    "scorer_type": verdict.scorer_type,
+                    "explanation": verdict.explanation,
+                },
+            )
+
     return RunResult(
         run_id=run_id,
         stop_reason=stop_reason,
@@ -147,4 +181,7 @@ async def run_agent(
         events=events,
         backend_info=ctx.backend_info,
         usage_limit_resets_at=ctx.usage_limit_resets_at,
+        passed=passed,
+        score=points,
+        score_explanation=explanation,
     )
