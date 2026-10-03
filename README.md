@@ -4,7 +4,7 @@
 
 Three Claude models (Haiku 4.5, Sonnet 5.5, and Opus 5.5) each answered the same 30 tasks three times, with the same prompt, tools, and limits. That makes 270 recorded answers. Poison Pen turns them into a 1930s country-house mystery. Each answer is an unsigned letter found at dinner, seated beside one of six guests. You decide which letters to trust without knowing who wrote them. Then you see the authors, how each letter scored, and Anthropic's published benchmarks for the same models. Under the game, it is a blind human evaluation with the usual ways of cheating designed out.
 
-**Play it:** _the live link is added here at launch._
+**Play it: [agent-eval-arena.vercel.app](https://agent-eval-arena.vercel.app/)**
 
 ## How it works
 

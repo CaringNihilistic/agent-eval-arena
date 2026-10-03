@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current state: Checkpoint C (launch) built and tested locally; the README is written. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 270 recorded runs (three of every model on every task). Waiting on the owner to deploy to Vercel Hobby and Neon Free; then run Playwright against the live URL, clean up its decisions, and add the link to the README. No new features. `docs/PLAN.md` Sections 0, 0.1, and 0.2 are the current design.** Update this line at the end of every checkpoint.
+**Current state: Checkpoint C (launch) done. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 270 recorded runs (three of every model on every task), live at https://agent-eval-arena.vercel.app/ (Vercel Hobby, Neon Free). The Playwright suite passed against it on 2026-10-03. Its test decisions must be removed from the live database with `db:clean-e2e` after every live run. No new features. `docs/PLAN.md` Sections 0, 0.1, and 0.2 are the current design.** Update this line at the end of every checkpoint.
 
 ## How we work
 
