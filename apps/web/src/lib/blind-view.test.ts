@@ -190,10 +190,17 @@ describe("the agent's working folder", () => {
   });
 });
 
-describe("summary of a run still in progress", () => {
-  it("reports the step reached and no answer", () => {
+describe("summary sent before the decision", () => {
+  it("is the answer alone, with no step count", () => {
+    expect(summarizeBlindSide(blindView(leftRun.events, ALIAS))).toEqual({
+      finished: true,
+      final_answer: "179.45",
+    });
+  });
+
+  it("has no answer for a run still in progress", () => {
     const partial = blindView(leftRun.events.slice(0, 4), ALIAS);
 
-    expect(summarizeBlindSide(partial)).toEqual({ finished: false, steps: 1, final_answer: null });
+    expect(summarizeBlindSide(partial)).toEqual({ finished: false, final_answer: null });
   });
 });

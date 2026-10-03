@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: repoRoot,
   outputFileTracingIncludes: {
     "/api/**": ["../../data/**"],
+    // The portrait files, so /api/art can see which exist once deployed.
+    "/api/art": ["./public/guests/**"],
   },
 };
 

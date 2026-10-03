@@ -2,7 +2,6 @@
 // Every mode, played through the service against the real recordings.
 import { describe, expect, it } from "vitest";
 
-import { BLIND_TIMESTAMP } from "@/lib/blind-view";
 import { morningPostNumber, morningPostRoundId, weekendRoundId } from "@/lib/rounds";
 import { randomFor } from "@/lib/seed";
 import type { Answer, BlindRound, Mode, RevealedRound } from "@/lib/types";
@@ -60,17 +59,10 @@ function expectBlind(round: BlindRound, runIds: readonly string[]): void {
     ["authors", "decided", "game", "kind", "letters", "mode", "round_id", "task"].sort(),
   );
   for (const letter of round.letters) {
-    expect(Object.keys(letter).sort()).toEqual([
-      "events",
-      "final_answer",
-      "guest",
-      "seat",
-      "steps",
-    ]);
-    expect(new Set(letter.events.map((event) => event.timestamp))).toEqual(
-      new Set([BLIND_TIMESTAMP]),
-    );
+    // No trace and no step count: how many steps a run took tells the models apart.
+    expect(Object.keys(letter).sort()).toEqual(["final_answer", "guest", "seat"]);
   }
+  expect(JSON.stringify(round.letters)).not.toMatch(/"steps?"|"events"|tool_call|step_started/);
   expect(findLeaks(round.letters, secretsOf(runIds))).toEqual([]);
   expect(JSON.stringify(round.letters)).not.toMatch(NAMES);
   expect(round.round_id).not.toMatch(NAMES);
@@ -178,7 +170,6 @@ describe("redaction in every mode", () => {
         finished?.type === "run_finished" ? finished.payload.final_answer : undefined,
       );
       // Whether it held is the question, so nothing of the scorer's result may be there.
-      expect(letter.events.some((event) => event.type === "score_computed")).toBe(false);
       expect(JSON.stringify(view)).not.toMatch(/"holds"|"passed"|"checks"|hidden tests passed/);
     }
   });

@@ -20,6 +20,8 @@ import type {
 export const ELO_MODES: readonly Mode[] = ["drawing_room", "library"];
 /** Two-letter preference votes needed before costume and position bias are reported. */
 export const MIN_BIAS_VOTES = 30;
+/** Blind comparisons needed before the players' ranking is shown. Below this a ranking is noise. */
+export const MIN_RANKING_VOTES = 30;
 
 export interface PairwiseResult extends EloVote {
   mode: Mode;
@@ -364,6 +366,9 @@ export interface Leaderboard {
   category: Category | null;
   /** Pairwise preference results behind the Elo table, and how many came from each mode. */
   votes: number;
+  /** False until there are enough comparisons to rank on; the page then shows the count, not a ranking. */
+  ranking_ready: boolean;
+  votes_needed: number;
   votes_by_mode: Partial<Record<Mode, number>>;
   headline: HeadlineRow[];
   preference: EloRow[];
@@ -409,8 +414,14 @@ export function buildLeaderboard(
     configs.map((config) => config.model),
   );
 
+  const rankingReady = votes.length >= MIN_RANKING_VOTES;
   const eloRanks = rankDescending(
-    new Map(preference.map((row) => [row.config, row.votes > 0 ? Math.round(row.elo) : null])),
+    new Map(
+      preference.map((row) => [
+        row.config,
+        rankingReady && row.votes > 0 ? Math.round(row.elo) : null,
+      ]),
+    ),
   );
   const scorerRanks = rankDescending(new Map(objective.map((row) => [row.config, row.mean_score])));
 
@@ -434,6 +445,8 @@ export function buildLeaderboard(
   return {
     category,
     votes: votes.length,
+    ranking_ready: rankingReady,
+    votes_needed: MIN_RANKING_VOTES,
     votes_by_mode: byMode,
     headline,
     preference,

@@ -10,19 +10,24 @@ import { Portrait } from "@/components/theme/portrait";
 import { guest as guestById, type Expression, type GuestId } from "@/lib/guests";
 import type { Category, Seat } from "@/lib/types";
 
+/** How a letter was written. Known only after the decision. */
+export interface Working {
+  events: readonly TraceEvent[];
+  steps: number;
+}
+
 /**
- * One letter, as found at a guest's place: the guest, the letter's words, and,
- * folded away, how it was written. Everything here is shown before the
- * decision, so it must come only from the blind view; `children` is where the
- * reveal adds what was hidden.
+ * One letter, as found at a guest's place: the guest and the letter's words.
+ * Before the decision that is all there is, because the number of steps and
+ * tool calls gives the model away. The reveal adds, folded away, how it was
+ * written (`working`), and what was hidden (`children`).
  */
 export function LetterCard({
   seat,
   guest,
   expression = "neutral",
   answer,
-  events,
-  steps,
+  working = null,
   category,
   children,
 }: {
@@ -30,8 +35,7 @@ export function LetterCard({
   guest: GuestId;
   expression?: Expression;
   answer: string | null;
-  events: readonly TraceEvent[];
-  steps: number;
+  working?: Working | null;
   category: Category;
   children?: ReactNode;
 }) {
@@ -52,13 +56,13 @@ export function LetterCard({
       <section className="letter-hand" aria-label={`Letter ${seat}, as written`}>
         <AnswerView answer={answer} category={category} />
       </section>
-      {hasSomethingToShow(events) ? (
+      {working === null ? null : hasSomethingToShow(working.events) ? (
         <details className="text-sm">
           <summary className="deco-label cursor-pointer text-muted-foreground">
-            How it was written ({steps} {steps === 1 ? "step" : "steps"})
+            How it was written ({working.steps} {working.steps === 1 ? "step" : "steps"})
           </summary>
           <div className="mt-3">
-            <TraceList events={events} />
+            <TraceList events={working.events} />
           </div>
         </details>
       ) : (

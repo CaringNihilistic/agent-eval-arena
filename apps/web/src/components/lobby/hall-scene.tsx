@@ -87,7 +87,7 @@ function HallSpot({
       href={href}
       className="spot"
       data-active={active}
-      aria-label={`${MODE_NAMES[mode]}: ${place.toLowerCase()}`}
+      aria-label={`${place}: ${MODE_NAMES[mode]}`}
       onMouseEnter={() => onActive(mode)}
       onMouseLeave={() => onActive(null)}
       onFocus={() => onActive(mode)}
@@ -193,6 +193,35 @@ export function HallScene() {
           <Pane x={364} y={184} width={26} height={38} delay={1.7} />
           <Pane x={307} y={184} width={26} height={38} delay={0.2} />
 
+          {/* The five ways in. Their order here is the order Tab reaches them in, and it matches
+              the list of rooms below the picture. None overlaps another, so paint order is free. */}
+          {/* A Weekend at Wrenfield: the front door */}
+          <HallSpot
+            mode="weekend"
+            active={active === "weekend"}
+            onActive={setActive}
+            halo={<rect x="266" y="240" width="108" height="110" />}
+          >
+            <g className="fill-ink stroke-rose" strokeWidth="2">
+              <rect x="272" y="246" width="96" height="10" />
+              <rect x="278" y="256" width="10" height="88" />
+              <rect x="352" y="256" width="10" height="88" />
+              <path d="M262 344 H378 V352 H252 V360 H388 V352 H378" />
+            </g>
+            <rect x="298" y="266" width="44" height="78" className="fill-line" />
+            <rect
+              x="298"
+              y="266"
+              width="44"
+              height="78"
+              className="glass lit fill-sage"
+              style={timing({ "--delay": "1.5s" })}
+            />
+            <path d="M320 266 V344" className="stroke-ink" strokeWidth="2" />
+            <circle cx="314" cy="308" r="2" className="fill-ink" />
+            <circle cx="326" cy="308" r="2" className="fill-ink" />
+          </HallSpot>
+
           {/* The Drawing Room: the west window */}
           <HallSpot
             mode="drawing_room"
@@ -253,33 +282,6 @@ export function HallScene() {
               style={{ transformOrigin: "320px 98px", ...timing({ "--period": "480s" }) }}
             />
             <circle cx="320" cy="98" r="2.5" className="fill-stamp" />
-          </HallSpot>
-
-          {/* A Weekend at Wrenfield: the front door */}
-          <HallSpot
-            mode="weekend"
-            active={active === "weekend"}
-            onActive={setActive}
-            halo={<rect x="266" y="240" width="108" height="110" />}
-          >
-            <g className="fill-ink stroke-rose" strokeWidth="2">
-              <rect x="272" y="246" width="96" height="10" />
-              <rect x="278" y="256" width="10" height="88" />
-              <rect x="352" y="256" width="10" height="88" />
-              <path d="M262 344 H378 V352 H252 V360 H388 V352 H378" />
-            </g>
-            <rect x="298" y="266" width="44" height="78" className="fill-line" />
-            <rect
-              x="298"
-              y="266"
-              width="44"
-              height="78"
-              className="glass lit fill-sage"
-              style={timing({ "--delay": "1.5s" })}
-            />
-            <path d="M320 266 V344" className="stroke-ink" strokeWidth="2" />
-            <circle cx="314" cy="308" r="2" className="fill-ink" />
-            <circle cx="326" cy="308" r="2" className="fill-ink" />
           </HallSpot>
 
           {/* The Morning Post: the post box by the drive */}

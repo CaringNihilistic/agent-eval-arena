@@ -25,8 +25,8 @@ const SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "What you see before you decide",
     points: [
-      "What each author did (the tools it used and what came back), what it said, and its letter.",
-      "Not shown until you decide: which model wrote which letter, pass or fail, scores, word counts, tokens, cost, the models' thinking, all timing, and the guests' reactions. Haiku does not think and the models differ in speed, so either would give the author away. Replays run at one fixed pace for the same reason.",
+      "The task, and each letter as it was finally written.",
+      "Not shown until you decide: which model wrote which letter, how it was written (its steps, the tools it used and what came back), pass or fail, scores, word counts, tokens, cost, the models' thinking, all timing, and the guests' reactions. Haiku takes more steps than the other two, does not think, and differs in speed, so any of these would give the author away.",
       "The server withholds these; they are not merely hidden by the page.",
       "What is still not blind: writing style can hint at the author, and the recordings are in a public repository.",
     ],
@@ -50,7 +50,7 @@ const SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "Does the timetable hold?",
     points: [
-      "You see one letter and how it was written, and the scorer's verdict is withheld. For code and agent tasks, “it holds” means the answer passed hidden tests or matched the one right answer. For the other tasks it means the letter met every rule the task stated.",
+      "You see one letter, and the scorer's verdict is withheld. For code and agent tasks, “it holds” means the answer passed hidden tests or matched the one right answer. For the other tasks it means the letter met every rule the task stated.",
       "Far more letters hold than fall apart, so rounds are dealt by outcome: about half the time you are shown one that held and half the time one that did not. Guessing “it holds” every time is right only about half the time.",
     ],
   },

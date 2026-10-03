@@ -137,7 +137,7 @@ export function DecisionPanel({
 
   return (
     <Panel aria-label="Your verdict" className="flex flex-col gap-4">
-      <h3 className="deco-title text-xl">{question ?? QUESTIONS[kind]}</h3>
+      <h2 className="deco-title text-xl">{question ?? QUESTIONS[kind]}</h2>
 
       <fieldset disabled={pending} className="flex flex-col gap-3">
         <legend className="sr-only">Your answer</legend>

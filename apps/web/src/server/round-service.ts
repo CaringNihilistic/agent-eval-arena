@@ -183,15 +183,10 @@ function gameState(
 function blindRound(recordings: Recordings, plan: RoundPlan, game: GameState | null): BlindRound {
   const letters: BlindLetter[] = plan.seats.map((seat) => {
     const alias = seatAlias(plan.id, seat.seat);
-    const events = blindView(recordings.events(seat.run_id), alias);
-    const summary = summarizeBlindSide(events);
-    return {
-      seat: seat.seat,
-      guest: seat.guest,
-      steps: summary.steps,
-      final_answer: summary.final_answer,
-      events,
-    };
+    // Only the answer leaves the server. The trace stays behind until the
+    // reveal: how many steps and tool calls a run took gives its model away.
+    const summary = summarizeBlindSide(blindView(recordings.events(seat.run_id), alias));
+    return { seat: seat.seat, guest: seat.guest, final_answer: summary.final_answer };
   });
   return {
     round_id: plan.id,

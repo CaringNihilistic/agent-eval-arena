@@ -195,13 +195,15 @@ export interface OfficialBenchmarks {
 
 // -------------------------------------------------------------- responses
 
-/** A letter before the decision: what was done and what was written, nothing else. */
+/**
+ * A letter before the decision: what was written, nothing else. How it was
+ * written (the trace) waits for the reveal, because the number of steps and
+ * tool calls tells the models apart.
+ */
 export interface BlindLetter {
   seat: Seat;
   guest: GuestId;
-  steps: number;
   final_answer: string | null;
-  events: TraceEvent[];
 }
 
 export interface WeekendState {

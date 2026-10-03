@@ -12,6 +12,7 @@ import {
   eloVotes,
   lengthBias,
   MIN_BIAS_VOTES,
+  MIN_RANKING_VOTES,
   modelTotals,
   objectiveTable,
   officialRanking,
@@ -426,6 +427,32 @@ describe("the whole record", () => {
     expect(board.votes).toBe(5);
     expect(board.votes_by_mode).toEqual({ drawing_room: 2, library: 3 });
     expect(code.votes).toBe(1);
+  });
+
+  it("shows no players' ranking until there are thirty comparisons", () => {
+    const few = buildLeaderboard([], sided(MIN_RANKING_VOTES - 1), OFFICIAL, configs, null);
+    const enough = buildLeaderboard([], sided(MIN_RANKING_VOTES), OFFICIAL, configs, null);
+
+    expect(few).toMatchObject({ ranking_ready: false, votes: 29, votes_needed: 30 });
+    expect(few.headline.every((row) => row.elo_rank === null)).toBe(true);
+    // The ratings are still computed; it is the ranking that is withheld.
+    expect(few.preference.find((row) => row.config === `${OPUS}@v1`)?.votes).toBe(29);
+    expect(enough.ranking_ready).toBe(true);
+    expect(enough.headline.find((row) => row.config === `${OPUS}@v1`)?.elo_rank).toBe(1);
+    expect(enough.headline.find((row) => row.config === `${HAIKU}@v1`)?.elo_rank).toBe(2);
+  });
+
+  it("counts the votes of the category being shown toward the minimum", () => {
+    const mixed = [
+      ...sided(MIN_RANKING_VOTES),
+      ...Array.from({ length: 4 }, () => decision({ task_category: "code" })),
+    ];
+
+    expect(buildLeaderboard([], mixed, OFFICIAL, configs, null).ranking_ready).toBe(true);
+    expect(buildLeaderboard([], mixed, OFFICIAL, configs, "code")).toMatchObject({
+      ranking_ready: false,
+      votes: 4,
+    });
   });
 
   it("shows no vote rank before anyone has voted", () => {

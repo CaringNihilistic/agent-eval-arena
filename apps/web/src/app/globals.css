@@ -442,6 +442,9 @@
   }
 
   /* A part of the Hall that leads somewhere: the door, a window, the clock, the post box. */
+  /* Its focus indicator is the halo: a thick sage outline drawn around the part
+     itself, which follows its shape. The browser's own outline would box the
+     link's bounding rectangle inside the picture and is replaced by it. */
   .spot {
     cursor: pointer;
     outline: none;

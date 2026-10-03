@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -8,7 +9,6 @@ import { CopyButton } from "@/components/game/copy-button";
 import { DecisionPanel } from "@/components/game/decision-panel";
 import { GameStatus } from "@/components/game/game-status";
 import { LetterCard } from "@/components/game/letter-card";
-import { RevealPanel } from "@/components/game/reveal-panel";
 import { Label, Panel } from "@/components/theme/ornament";
 import { Button } from "@/components/ui/button";
 import { createChallenge, fetchNextRound, sendDecision } from "@/lib/client-api";
@@ -24,6 +24,11 @@ import {
   type RevealedRound,
   type Seat,
 } from "@/lib/types";
+
+// The reveal is only needed after a decision, so its code is fetched then.
+const RevealPanel = dynamic(() =>
+  import("@/components/game/reveal-panel").then((module) => module.RevealPanel),
+);
 
 function TaskCard({ round }: { round: BlindRound | RevealedRound }) {
   return (
@@ -78,6 +83,7 @@ function BlindTable({
           ))}
         </div>
       ) : null}
+      <h2 className="sr-only">The letters</h2>
       <div className={`grid gap-4 ${columns}`}>
         {round.letters.map((letter) => (
           <div key={letter.seat} className={many && tab !== letter.seat ? "hidden lg:block" : ""}>
@@ -85,8 +91,6 @@ function BlindTable({
               seat={letter.seat}
               guest={letter.guest}
               answer={letter.final_answer}
-              events={letter.events}
-              steps={letter.steps}
               category={round.task.category}
             />
           </div>

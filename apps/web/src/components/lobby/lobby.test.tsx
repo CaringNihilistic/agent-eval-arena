@@ -10,7 +10,7 @@ import { GuestRow } from "@/components/lobby/guest-row";
 import { HallScene } from "@/components/lobby/hall-scene";
 import { Reveal } from "@/components/lobby/reveal";
 import { ROOMS } from "@/lib/rooms";
-import { MODE_NAMES, MODES } from "@/lib/types";
+import { MODES } from "@/lib/types";
 
 vi.mock("@/lib/client-api", () => ({ fetchArt: async () => ({}) }));
 
@@ -23,18 +23,23 @@ describe("the picture of Wrenfield Hall", () => {
     show(<HallScene />);
 
     expect(ROOMS.map((room) => room.mode).sort()).toEqual([...MODES].sort());
-    for (const room of ROOMS) {
-      const link = screen.getByRole("link", { name: new RegExp(`^${MODE_NAMES[room.mode]}`) });
-      expect(link).toHaveAttribute("href", room.href);
-    }
-    expect(screen.getAllByRole("link")).toHaveLength(5);
+    const links = screen.getAllByRole("link");
+    // In the order Tab reaches them: the main game first, then the rooms as listed.
+    expect(links.map((link) => link.getAttribute("aria-label"))).toEqual([
+      "The front door: A Weekend at Wrenfield",
+      "The west window: The Drawing Room",
+      "The east window: The Library Gathering",
+      "The tower clock: Does the Timetable Hold?",
+      "The post box: The Morning Post",
+    ]);
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(ROOMS.map((room) => room.href));
   });
 
   it("says where a part leads when it is pointed at or reached by keyboard", async () => {
     const user = userEvent.setup();
     show(<HallScene />);
     const caption = screen.getByTestId("hall-caption");
-    const clock = screen.getByRole("link", { name: /^Does the Timetable Hold\?/ });
+    const clock = screen.getByRole("link", { name: "The tower clock: Does the Timetable Hold?" });
 
     expect(caption).toHaveTextContent("Try the front door");
     await user.hover(clock);
@@ -44,8 +49,11 @@ describe("the picture of Wrenfield Hall", () => {
     await user.unhover(clock);
     expect(caption).toHaveTextContent("Try the front door");
 
+    // The first stop for a keyboard is the front door.
     await user.tab();
-    expect(caption).not.toHaveTextContent("Try the front door");
+    expect(caption).toHaveTextContent("A Weekend at Wrenfield");
+    await user.tab();
+    expect(caption).toHaveTextContent("The Drawing Room");
   });
 
   it("describes the picture to someone who cannot see it", () => {

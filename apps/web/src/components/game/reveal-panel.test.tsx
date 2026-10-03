@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { LetterCard } from "@/components/game/letter-card";
 import { RevealPanel } from "@/components/game/reveal-panel";
-import { blindView } from "@/lib/blind-view";
 import type { RevealedLetter, RevealedRound } from "@/lib/types";
 import { leftRun, rightRun, type FixtureRun } from "@/test/trace-fixtures";
 
@@ -228,18 +227,9 @@ describe("The Gathering in the Library", () => {
 });
 
 describe("a letter before the decision", () => {
-  const blind = blindView(leftRun.events, "dr.x:A");
-
   it("shows the guest with a neutral face, and nothing about the author", () => {
     const { container } = show(
-      <LetterCard
-        seat="A"
-        guest="pell"
-        answer="179.45"
-        events={blind}
-        steps={2}
-        category="agent"
-      />,
+      <LetterCard seat="A" guest="pell" answer="179.45" category="agent" />,
     );
 
     expect(screen.getByAltText("Mrs. Dorcas Pell")).toHaveAttribute("data-expression", "neutral");
@@ -248,18 +238,34 @@ describe("a letter before the decision", () => {
     expect(container.textContent).not.toContain("Thinking");
   });
 
+  it("shows no step count and no working, which would give the model away", () => {
+    const { container } = show(
+      <LetterCard seat="A" guest="pell" answer="179.45" category="agent" />,
+    );
+
+    expect(container.textContent).not.toMatch(/step|how it was written|one sitting/i);
+    expect(container.querySelector("details")).toBeNull();
+  });
+
   it("sets the letter's own words in the letter hand", () => {
+    show(<LetterCard seat="B" guest="ivy" answer="Dear Sir" category="writing" />);
+
+    expect(screen.getByLabelText("Letter B, as written")).toHaveClass("letter-hand");
+  });
+});
+
+describe("a letter after the decision", () => {
+  it("unfolds how it was written, with its step count", () => {
     show(
       <LetterCard
-        seat="B"
-        guest="ivy"
-        answer="Dear Sir"
-        events={blind}
-        steps={2}
-        category="writing"
+        seat="A"
+        guest="pell"
+        answer="179.45"
+        working={{ events: leftRun.events, steps: 2 }}
+        category="agent"
       />,
     );
 
-    expect(screen.getByLabelText("Letter B, as written")).toHaveClass("letter-hand");
+    expect(screen.getByText("How it was written (2 steps)")).toBeInTheDocument();
   });
 });

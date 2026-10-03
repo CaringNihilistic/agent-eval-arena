@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 type Drawing = { status: "drawing" } | { status: "drawn"; svg: string } | { status: "failed" };
 
@@ -17,8 +17,33 @@ function token(name: string): string {
 export function MermaidDiagram({ code }: { code: string }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const [drawing, setDrawing] = useState<Drawing>({ status: "drawing" });
+  const holder = useRef<HTMLDivElement | null>(null);
+  // Mermaid is large (440 KB compressed) and drawing blocks a phone for a second
+  // or more, so a diagram is drawn when it is on screen, not when the page
+  // loads. Until then its source is shown.
+  const [near, setNear] = useState(false);
 
   useEffect(() => {
+    const element = holder.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setNear(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0 },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!near) return;
     let cancelled = false;
     async function draw() {
       try {
@@ -56,7 +81,7 @@ export function MermaidDiagram({ code }: { code: string }) {
     return () => {
       cancelled = true;
     };
-  }, [code, id]);
+  }, [code, id, near]);
 
   if (drawing.status === "drawn") {
     return (
@@ -70,7 +95,7 @@ export function MermaidDiagram({ code }: { code: string }) {
     );
   }
   return (
-    <div className="flex flex-col gap-2 not-italic">
+    <div ref={holder} className="flex flex-col gap-2 not-italic">
       <p className="text-sm text-muted-foreground" role="status">
         {drawing.status === "failed"
           ? "This diagram could not be drawn. Its source is shown instead."

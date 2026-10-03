@@ -1,6 +1,6 @@
 # Agent Eval Arena: Plan
 
-Status: revised 2026-10-02. Checkpoints B and B2 are complete: 270 runs are recorded (three of every model on every task) and the Poison Pen game (Section 0.1) works locally in all five modes. **Sections 0 and 0.1 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
+Status: revised 2026-10-03. Checkpoints B and B2 are complete: 270 runs are recorded (three of every model on every task) and the Poison Pen game (Section 0.1) works locally in all five modes. Checkpoint C (launch, Section 0.2) is built and tested locally and waits on the owner's deployment to Vercel and Neon. **Sections 0, 0.1, and 0.2 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
 
 Where this plan departs from the brief, the departure is listed in [Section 12](#12-deviations-from-the-brief) and the reason is in `DECISIONS.md`.
 
@@ -16,7 +16,7 @@ Where this plan departs from the brief, the departure is listed in [Section 12](
 
 **The site.** Next.js only. Route handlers read the recordings from `data/` and keep votes and rate-limit counters in Postgres (Docker locally, Neon in public). The Python backend is used only to record. **Live mode is not built**: every match is a replay.
 
-**Blind view.** Before the vote the server withholds: config and model names, the system prompt, run ids, tokens, cost, pass/fail and the constraint checks, **the models' thinking blocks, and every measure of time** (per-call latency, tool latency, run time, and the timestamps, which are replaced by a constant). Haiku does not think and the models differ in speed, so either would identify the model. For the same reason the replay plays every event at one fixed pace before the vote, not at the recorded pace. A voter sees the tool calls and results, what the model said, the step count, and the final answer.
+**Blind view.** Before the vote the server withholds: config and model names, the system prompt, run ids, tokens, cost, pass/fail and the constraint checks, **the models' thinking blocks, and every measure of time** (per-call latency, tool latency, run time, and the timestamps, which are replaced by a constant). Haiku does not think and the models differ in speed, so either would identify the model. **Since 2026-10-03 the trace is not sent at all before the decision**, only the final answer: Haiku averages 1.89 steps to the others' 1.22, so the step count and the number of tool calls identified it (Section 0.2). The redaction still runs, and the answer is read from its output.
 
 **Reveal.** After the vote: both model names, a scorecard of this site's measured results for both sides (scorer result, steps, tool calls, tokens, active time, answer length, cost actual and at API rates), the vote tallies for the match, the full traces with thinking and timing, and an "Official benchmarks" panel.
 
@@ -50,7 +50,7 @@ Requested by the owner on 2026-10-02. The replay site becomes a game with a 1930
 ### Fairness rules (these outrank everything else in this section)
 
 - **Seats are costumes, not models.** The guest shown beside a letter comes from a hash of the round (and, in free-play modes, the voter), never from the run or its model. The function that assigns guests does not receive the model.
-- **Hidden before the decision:** model and config names, the system prompt, run ids, cost, tokens, all timing, thinking blocks, word counts, the scorer's result, and the guest's expression (the server sends none; the page shows neutral). One redaction function serves every mode, and the leak tests run over every mode's rounds built from the real recordings.
+- **Hidden before the decision:** model and config names, the system prompt, run ids, cost, tokens, all timing, thinking blocks, word counts, the scorer's result, how the letter was written (the trace, its steps and tool calls; added 2026-10-03), and the guest's expression (the server sends none; the page shows neutral). One redaction function serves every mode, and the leak tests run over every mode's rounds built from the real recordings.
 - **Stored with every decision:** mode, round kind, the guest and position of every letter, the run behind each, confidence, the trap flag, answer lengths, and pass state.
 - **Points only for answers that can be right or wrong:** naming the author, calling the timetable, accusing (or not) correctly. A preference earns no points, and nothing is awarded for agreeing with other players. The share of players who trusted the same letter is shown after the decision, as information.
 - **Elo uses only preferences from The Drawing Room and The Library Gathering, never a trap round**, and never a preference from the Weekend or the Morning Post.
@@ -69,12 +69,12 @@ Every model ran every task three times with the same settings (`arena record --t
 
 A round has a kind, and each mode is a way of dealing rounds.
 
-| Kind        | Shows                                                                             | Asks                                                                                                                 | Right answer?                                                                                                                                                 |
-| ----------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `duel`      | Two letters on one task                                                           | "Trust letter A", "Equally good", "Neither", "Trust letter B", or "Accuse: one author, two seats"                    | Only the accusation: right when the round is a trap (+50), wrong otherwise (−30). Trusting a letter in a trap round scores nothing and counts as being fooled |
-| `ranking`   | All three authors' letters on one task                                            | Rank 1-2-3. There is no accusation: all three authors are always present                                             | None                                                                                                                                                          |
-| `author`    | One letter                                                                        | Which of the three authors wrote it                                                                                  | Yes (+100)                                                                                                                                                    |
-| `timetable` | One letter in full, and how it was written. Only the scorer's verdict is withheld | "It holds" or "It falls apart": did it pass the hidden tests (code, agent) or meet all the stated rules (open-ended) | Yes (+40)                                                                                                                                                     |
+| Kind        | Shows                                                                 | Asks                                                                                                                 | Right answer?                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duel`      | Two letters on one task                                               | "Trust letter A", "Equally good", "Neither", "Trust letter B", or "Accuse: one author, two seats"                    | Only the accusation: right when the round is a trap (+50), wrong otherwise (−30). Trusting a letter in a trap round scores nothing and counts as being fooled |
+| `ranking`   | All three authors' letters on one task                                | Rank 1-2-3. There is no accusation: all three authors are always present                                             | None                                                                                                                                                          |
+| `author`    | One letter                                                            | Which of the three authors wrote it                                                                                  | Yes (+100)                                                                                                                                                    |
+| `timetable` | One letter in full. The scorer's verdict and the working are withheld | "It holds" or "It falls apart": did it pass the hidden tests (code, agent) or meet all the stated rules (open-ended) | Yes (+40)                                                                                                                                                     |
 
 Confidence ("A hunch", "Fairly sure", "Certain") is chosen before every submission and stored. It does not change points; the Casebook reports how often the player was right at each level.
 
@@ -137,6 +137,31 @@ Not built, or built more simply than the brief might suggest:
 ### Theme
 
 All colours, fonts, and ornament values are design tokens in `globals.css`; components use only the tokens. Claret background with faint pinstripes, parchment letters and cards with double-line inset borders, sage primary buttons, rose ornament lines, burgundy stamps. Fonts: Limelight for titles, Libre Baskerville for body and letters (letters in italic), Josefin Sans 600 uppercase for labels. A test computes the contrast of every text and background token pair in use and fails below WCAG AA. Portraits are simple original SVGs, four expressions per guest, generated by a script and stored under `public/guests/<id>/`.
+
+## 0.2 Checkpoint C: launch
+
+Requested by the owner on 2026-10-03. No new features; checks, fixes, deployment, and the README.
+
+**Final checks.**
+
+- **The Hall by keyboard.** The five hotspots in the Hall picture are links in this Tab order: the front door, the west window, the east window, the tower clock, the post box. Each has an accessible name such as "The front door: A Weekend at Wrenfield", shows a visible outline when focused, and updates the caption. Tested with Testing Library and Playwright.
+- **Lighthouse, mobile, on a local production build (2026-10-03).** Landing page: performance 94 to 96, accessibility 100. The Drawing Room: performance 88 to 91 over five runs (one of them a diagram round), accessibility 100, layout shift 0. Before this checkpoint it was 63 to 80.
+- **What moved the Drawing Room.** Sending no trace before the decision halved the page's JavaScript, from about 440 KB to 220 KB compressed. Mermaid (440 KB on its own) now loads only when a diagram is on screen. The first round is requested by an inline script while the page's code is still loading. The reveal panel's code loads after a decision. Header links no longer prefetch every room. Headings are in order, and the page reserves its height so nothing shifts when the letters arrive.
+- **What still limits it.** The largest paint is the task or a letter, at about 3.4 s on Lighthouse's simulated slow phone, because the round can only be drawn once the page's code has run. The server cannot draw it in advance: which round to deal depends on the player's id, which lives in the browser's local storage. Drawing it on the server would need a cookie, which the "no cookies" decision rules out. A diagram drawn on a slow phone also blocks the page for a second or more when it scrolls into view. Inlining the stylesheet was tried and made no measurable difference, so it was not kept.
+- **Earlier decisions, confirmed in code and tests.** Timetable rounds are dealt 50/50 by outcome (`rounds.test.ts`, `round-service.test.ts`). There is no Accuse button in The Library Gathering, and the server refuses an accusation on a ranking (`decision-panel.test.tsx`, `round-service.test.ts`, Playwright). Totals are over all three runs, with ranges (`modelTotals`, the reveal, and The Official Record).
+
+**The step-count leak (found by the owner, 2026-10-03).** Each blind letter showed "How it was written (N steps)", and the folded trace showed its steps and every tool call. Haiku takes 1.89 steps per task on average and the others 1.22, so the count was close to a name tag. Before a decision the server now sends each letter's seat, guest, and final answer, nothing else. The working, with its step count, appears at the reveal. The service test checks the exact fields of every blind letter in every mode, and Playwright checks that no blind letter has the working.
+
+**The leaderboard minimum.** The player ranking stays hidden until 30 preference votes count toward it. Until then the Official Record says "Not enough votes yet (X/30)". Costume and position bias already waited for 30 two-letter votes.
+
+**Deployment.** Vercel Hobby for the site and Neon Free for Postgres, both $0.
+
+- Vercel builds `apps/web` from the monorepo (Root Directory `apps/web`, pnpm 12 through Corepack). The recordings in `data/` are traced into the API functions by `outputFileTracingIncludes`.
+- The site reads two secrets from Vercel's environment settings, never from the repository: `DATABASE_URL` (Neon's pooled connection string) and `ARENA_IP_HASH_KEY` (a random key for hashing addresses; the server refuses decisions on Vercel without it).
+- `pnpm --filter web db:migrate` applies the schema (`apps/web/db/schema.mjs`, idempotent). The tables are also created on first use. `db:clean-e2e` removes the decisions the end-to-end test made, which use voter ids with a fixed prefix. Both read the connection string from an environment variable or the git-ignored `.env` and never print it.
+- `E2E_BASE_URL=<url> pnpm --filter web e2e` runs the same Playwright suite against a deployed site, with no local build or database.
+
+**README.** For the public repository: a GIF of the Hall and one Drawing Room round, the pitch, how it works, the measured results with ranges, the findings, placeholders for the vote-based findings, how to run it locally, and the known limits.
 
 ## 1. What we're building
 
@@ -386,6 +411,8 @@ Envelope: `run_id`, `side` (`left`, `right`, or null on run permalinks), `seq`, 
 
 ### 4.1 Blind view
 
+> **Superseded (2026-10-03).** Before a decision the server now sends only each letter's final answer, its seat, and its guest. The redaction below still runs and the answer is taken from its output, but no events are sent until the reveal. See Section 0.2.
+
 Before the vote, a voter sees only what each agent did and what it answered: the tool calls and their results, what the model said, the step count, and the final answer. If the result were visible first, voters would pick the side that passed. If the model were identifiable, they would vote for the name.
 
 Redaction happens on the server, in one function (`apps/web/src/lib/blind-view.ts`). Until the requesting voter has voted on a match, everything served for that match is filtered, and each filtered event carries `redacted: true`:
@@ -610,7 +637,7 @@ On open-ended tasks, do voters prefer the longer answer?
 
 ### 7.9 Methodology notes for `/about`
 
-- **What voters see.** Before voting: both traces and final answers, and the step count. After voting: the models, pass/fail or constraints met, cost, tokens, timing, the models' thinking, and Anthropic's published scores. The server withholds the rest.
+- **What voters see.** Before voting: the final answers only (since 2026-10-03; traces and step counts gave Haiku away). After voting: the traces, the models, pass/fail or constraints met, cost, tokens, timing, the models' thinking, and Anthropic's published scores. The server withholds the rest.
 - **What is still not blind.** Writing style can hint at the model. The recordings are in a public repository, so a determined visitor can look a run up. Position bias is reported.
 - **Scoring.** Code and agent tasks are scored pass or fail by hidden tests or a deterministic check. Writing, diagram, explanation, and tech-stack tasks have no right answer: they get automatic constraint checks only (length limit, required sections, stated constraints mentioned, the diagram parses), shown as "constraints met X/Y". That number is not a measure of quality; quality on those tasks is decided by votes. No LLM judge is used.
 - **Agreement and length bias.** Agreement between votes and the scorer uses code and agent tasks only. On open-ended tasks the site reports how often the longer answer won.
@@ -670,13 +697,14 @@ Railway and Fly.io are dropped.
 
 The original ten phases were regrouped into checkpoints on 2026-10-02.
 
-| Step          | Deliverable                                                                                                                                                                                                                                                   | State       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| Phases 0 to 3 | Plan, scaffold, runner and tracing, Claude backend, task bank and scorers                                                                                                                                                                                     | Done        |
-| Checkpoint A  | Six-category task bank, constraint scoring, Mermaid parsing in the sandbox, four-run pilot                                                                                                                                                                    | Done        |
-| Checkpoint B  | Three configs; blind view hides thinking and time; `arena record`; all 90 runs recorded; replay site with matches, blind voting, reveal with official benchmarks, three-ranking leaderboard, `/about`; votes and rate limits in Postgres                      | Done        |
-| Checkpoint B2 | "Poison Pen": second runs recorded (180 in all); five modes; guests and seats dealt at random; accusations, confidence, traps; reveal; points, ranks, distinctions, Casebook, challenges; costume and position bias; the theme; Playwright test of every mode | Done        |
-| Next          | README with measured results; deploy to Vercel Hobby and Neon Free; proper guest illustrations; graph view and run permalinks if still wanted                                                                                                                 | Not started |
+| Step          | Deliverable                                                                                                                                                                                                                                                   | State                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Phases 0 to 3 | Plan, scaffold, runner and tracing, Claude backend, task bank and scorers                                                                                                                                                                                     | Done                                 |
+| Checkpoint A  | Six-category task bank, constraint scoring, Mermaid parsing in the sandbox, four-run pilot                                                                                                                                                                    | Done                                 |
+| Checkpoint B  | Three configs; blind view hides thinking and time; `arena record`; all 90 runs recorded; replay site with matches, blind voting, reveal with official benchmarks, three-ranking leaderboard, `/about`; votes and rate limits in Postgres                      | Done                                 |
+| Checkpoint B2 | "Poison Pen": second runs recorded (180 in all); five modes; guests and seats dealt at random; accusations, confidence, traps; reveal; points, ranks, distinctions, Casebook, challenges; costume and position bias; the theme; Playwright test of every mode | Done                                 |
+| Checkpoint C  | Launch: final accessibility and speed checks, the step-count leak closed, the leaderboard minimum, database scripts, Playwright against a live URL, the README with measured results, deployment instructions (Section 0.2)                                   | Built; deployment waits on the owner |
+| Next          | Proper guest illustrations; graph view and run permalinks if still wanted                                                                                                                                                                                     | Not started                          |
 
 Checkpoint B acceptance, all met: every recorded match is served blind with no withheld field or identifying string (tested over all 90); a vote is stored once per voter per match with both sides' pass state and answer lengths; rate-limit counters persist across a restart (tested against Postgres); Elo matches hand-computed examples and the bootstrap is deterministic under a fixed seed; a model answer containing `<script>` or `onerror` renders as text; a browser walkthrough of start, replay, vote, reveal, and leaderboard works locally.
 

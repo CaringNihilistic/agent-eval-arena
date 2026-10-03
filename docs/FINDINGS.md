@@ -197,3 +197,11 @@ Requests refused with HTTP 503 appear to count against the daily quota: `gemini-
 - **It was not only a test problem.** The live sandbox kills what it takes for strays, so it had been killing its own health check about 3% of the time.
 - **Fix.** A process started from outside the container has a parent the container cannot see. The check now recognises those and leaves them alone. Code the sandbox runs cannot get such a parent. After the fix: 0 strays in 161,210 calls.
 - **A second fault found on the way.** A Mermaid parser that timed out was reported as "the diagram is invalid". On a slow machine that would have scored a valid diagram as failing, with nothing to show it. It is now an error, and the run is left unscored and re-run. No recorded run was affected.
+
+## 12. The step count named the author
+
+**Found by the owner, 2026-10-03, before launch.** A blind letter showed "How it was written (N steps)" and, folded away, its trace: a heading for each step and every tool call. Over the 270 runs, Haiku 4.5 averages 1.89 steps per task (170 model calls), against 1.23 for Sonnet 5.5 (111) and 1.22 for Opus 5.5 (110). Haiku checks its own work with tools before answering, and the other two mostly answer in one call. So a letter that took two or three steps was very likely Haiku's, and a player could have learned that without reading a word of it.
+
+- **Why the redaction missed it.** The blind view removed everything that measures cost or time, but the number of steps is neither. It is behaviour, and here behaviour differs by model.
+- **Fix.** Before a decision the server sends each letter's seat, guest, and final answer, and nothing else. The trace and its step count are sent with the reveal. The service test checks the exact fields of every blind letter in every mode, and Playwright checks that no blind letter shows its working.
+- **What it shows about blind evaluation.** Anything that differs systematically between models can identify them, not only names and prices. Answer length and style still can, and the About page says so.

@@ -16,7 +16,14 @@ import type {
 } from "@/lib/types";
 import type { ChallengeView } from "@/server/round-service";
 
-const VOTER_KEY = "arena-voter-id";
+export const VOTER_KEY = "arena-voter-id";
+/** Where a mode page's inline script leaves its early request for the first round. */
+export const EARLY_ROUND_KEY = "__arenaEarlyRound";
+
+interface EarlyRound {
+  request: string;
+  response: Promise<{ ok: boolean; status: number; body: unknown }>;
+}
 
 /** An anonymous id kept in this browser. It only stops one browser deciding a round twice. */
 export function voterId(): string {
@@ -65,7 +72,23 @@ export interface NextRoundResponse {
   game: GameState | null;
 }
 
-export function fetchNextRound(mode: Mode, seed: string | null): Promise<NextRoundResponse> {
+/**
+ * The next round of a mode. The first call on a mode page uses the request the
+ * page already made while its scripts were loading, if it was for the same mode
+ * and seed and it succeeded; that request is used once and then forgotten.
+ */
+export async function fetchNextRound(mode: Mode, seed: string | null): Promise<NextRoundResponse> {
+  const holder = window as unknown as Record<string, EarlyRound | undefined>;
+  const early = holder[EARLY_ROUND_KEY];
+  delete holder[EARLY_ROUND_KEY];
+  if (early && early.request === JSON.stringify({ mode, seed })) {
+    try {
+      const result = await early.response;
+      if (result.ok) return result.body as NextRoundResponse;
+    } catch {
+      // Fall through to an ordinary request.
+    }
+  }
   return call("/api/rounds/next", post({ mode, seed }));
 }
 

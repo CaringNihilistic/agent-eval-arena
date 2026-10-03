@@ -105,9 +105,9 @@ function Unmasking({
       </p>
       <ScoreLine letter={letter} />
       <p>
-        {letter.answer_words} words · {letter.steps} {letter.steps === 1 ? "step" : "steps"} ·{" "}
-        {(letter.latency_ms / 1000).toFixed(1)} s · {usd(letter.reference_cost_usd)} at API rates (
-        {usd(letter.cost_usd)} actual)
+        {letter.answer_words} {letter.answer_words === 1 ? "word" : "words"} · {letter.steps}{" "}
+        {letter.steps === 1 ? "step" : "steps"} · {(letter.latency_ms / 1000).toFixed(1)} s ·{" "}
+        {usd(letter.reference_cost_usd)} at API rates ({usd(letter.cost_usd)} actual)
       </p>
       <p className="text-xs text-muted-foreground">
         This author over all 30 tasks, {acrossRuns(totals.takes)}: passed {rangeText(totals.passes)}{" "}
@@ -170,8 +170,7 @@ export function RevealPanel({ round }: { round: RevealedRound }) {
             guest={letter.guest}
             expression={letter.expression}
             answer={letter.final_answer}
-            events={letter.events}
-            steps={letter.steps}
+            working={{ events: letter.events, steps: letter.steps }}
             category={round.task.category}
           >
             <Unmasking letter={letter} authors={round.authors} />

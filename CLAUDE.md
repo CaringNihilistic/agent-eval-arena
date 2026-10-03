@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current state: Checkpoint B2 complete. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 270 recorded runs (three of every model on every task), working locally in all five modes. Next (not started, needs the owner's go): README results, deployment to Vercel and Neon, proper guest illustrations. `docs/PLAN.md` Sections 0 and 0.1 are the current design.** Update this line at the end of every checkpoint.
+**Current state: Checkpoint C (launch) built and tested locally; the README is written. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 270 recorded runs (three of every model on every task). Waiting on the owner to deploy to Vercel Hobby and Neon Free; then run Playwright against the live URL, clean up its decisions, and add the link to the README. No new features. `docs/PLAN.md` Sections 0, 0.1, and 0.2 are the current design.** Update this line at the end of every checkpoint.
 
 ## How we work
 
@@ -63,6 +63,9 @@ pnpm typecheck                         # tsc + mypy (api and sandbox)
 pnpm test:web                          # vitest
 pnpm test:api                          # pytest for api and sandbox, in their containers
 pnpm test:e2e                          # Playwright: builds the site, plays every mode in Edge, own database
+E2E_BASE_URL=<url> pnpm --filter web e2e   # the same suite against a deployed site (no build, no local database)
+pnpm --filter web db:migrate -- --from NAME     # apply the schema to the database in env var NAME (default DATABASE_URL)
+pnpm --filter web db:clean-e2e -- --from NAME   # remove the decisions the e2e test made there
 node scripts/make-guest-portraits.mjs  # redraw the built-in SVG portraits
 pnpm format                            # prettier + ruff format
 pnpm schema:gen                        # regenerate TS and Pydantic types from the JSON Schema
@@ -125,8 +128,8 @@ The Postgres store tests run only when `TEST_DATABASE_URL` is set (see `apps/web
 ### Fairness (the game's rules; these outrank everything else in the web app)
 
 - Guests are costumes. Seats are dealt from a hash of the round (and the voter, in free play), never from the run or its model.
-- Before a decision the server withholds: config, model, system prompt, run id, tokens, cost, word counts, the scorer's result, thinking blocks, latencies, real timestamps, the agent's working-folder name, the trap flag, and the guests' expressions (PLAN Sections 4.1 and 0.1). Redaction happens on the server, never in the browser.
-- Nothing shown before a decision may depend on recorded time. Replays use one fixed pace.
+- Before a decision a letter is sent as its seat, its guest, and its final answer (taken from the blind view), nothing else. The server withholds: config, model, system prompt, run id, tokens, cost, word counts, the scorer's result, thinking blocks, latencies, timestamps, the trace with its steps and tool calls (Haiku takes more steps, so the count identifies it), the agent's working-folder name, the trap flag, and the guests' expressions (PLAN Sections 0.1 and 0.2). Redaction happens on the server, never in the browser.
+- Nothing shown before a decision may depend on recorded time or on how many steps a run took.
 - Any new field that reveals the result, the cost, the speed, or the identity of an author must be added to the blind-view redaction and to `WITHHELD_KEYS` in the leak scan, and a new mode must be added to the every-mode leak test.
 - A check that cannot run is an error, never a failed answer: a parser timeout or an unreachable sandbox leaves the run unscored.
 - Points come only from answers that can be right or wrong. A preference earns nothing, and nothing is awarded for agreeing with other players.

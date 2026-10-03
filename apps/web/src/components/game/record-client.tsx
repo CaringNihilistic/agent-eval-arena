@@ -83,6 +83,7 @@ function Entries({ board }: { board: LeaderboardResponse }) {
   const name = (config: string) =>
     board.headline.find((row) => row.config === config)?.model ?? config;
   const agreement = board.agreement;
+  const notEnough = `Not enough votes yet (${board.votes}/${board.votes_needed})`;
   const takes = Math.max(1, ...board.objective.map((row) => row.takes));
   const byMode = Object.entries(board.votes_by_mode)
     .map(([mode, count]) => `${count} from ${MODE_NAMES[mode as Mode]}`)
@@ -98,7 +99,7 @@ function Entries({ board }: { board: LeaderboardResponse }) {
           head={["Author", "Players (Elo)", "Official benchmarks", "Our scorer"]}
           rows={board.headline.map((row) => [
             row.model,
-            row.votes === 0 ? "— (no votes yet)" : `${rank(row.elo_rank)} · ${Math.round(row.elo)}`,
+            board.ranking_ready ? `${rank(row.elo_rank)} · ${Math.round(row.elo)}` : notEnough,
             row.official_rank === null ? "— (no shared benchmark)" : rank(row.official_rank),
             row.mean_score === null ? "—" : `${rank(row.scorer_rank)} · ${percent(row.mean_score)}`,
           ])}
@@ -116,21 +117,27 @@ function Entries({ board }: { board: LeaderboardResponse }) {
         title="Players' preference"
         note={`Elo from ${board.votes} blind comparisons${byMode ? ` (${byMode})` : ""}: K=32, start 1000, replayed in order. Only preferences from The Drawing Room and The Library Gathering count, and never a round where one author held both seats. The range is a 95% bootstrap interval.`}
       >
-        <Table
-          caption="Elo ratings from players' preferences"
-          head={["Author", "Elo", "95% interval", "Comparisons", "Won", "Lost", "Tied"]}
-          rows={board.preference.map((row) => [
-            name(row.config),
-            Math.round(row.elo),
-            row.ci_low === null || row.ci_high === null
-              ? "—"
-              : `${Math.round(row.ci_low)}–${Math.round(row.ci_high)}`,
-            row.votes,
-            row.wins,
-            row.losses,
-            row.ties,
-          ])}
-        />
+        {board.ranking_ready ? (
+          <Table
+            caption="Elo ratings from players' preferences"
+            head={["Author", "Elo", "95% interval", "Comparisons", "Won", "Lost", "Tied"]}
+            rows={board.preference.map((row) => [
+              name(row.config),
+              Math.round(row.elo),
+              row.ci_low === null || row.ci_high === null
+                ? "—"
+                : `${Math.round(row.ci_low)}–${Math.round(row.ci_high)}`,
+              row.votes,
+              row.wins,
+              row.losses,
+              row.ties,
+            ])}
+          />
+        ) : (
+          <p data-testid="ranking-pending">
+            {notEnough}. A ranking from fewer comparisons would be noise, so none is shown.
+          </p>
+        )}
       </Entry>
 
       <Entry

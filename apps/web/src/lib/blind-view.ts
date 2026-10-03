@@ -148,24 +148,19 @@ export function blindView(events: readonly TraceEvent[], alias: string): TraceEv
 
 export interface BlindSideSummary {
   finished: boolean;
-  steps: number;
   final_answer: string | null;
 }
 
-/** The only figures shown beside a trace before the decision: the step count and the answer. */
+/**
+ * All a voter is sent before the decision: the answer, read from the blind
+ * view so it is scrubbed like the rest. Not the step count: Haiku takes more
+ * steps than the others, so the count alone gives it away.
+ */
 export function summarizeBlindSide(events: readonly TraceEvent[]): BlindSideSummary {
-  let steps = 0;
   for (const event of events) {
-    if (event.type === "step_started") {
-      steps = Math.max(steps, event.payload.step);
-    }
     if (event.type === "run_finished") {
-      return {
-        finished: true,
-        steps: event.payload.steps,
-        final_answer: event.payload.final_answer,
-      };
+      return { finished: true, final_answer: event.payload.final_answer };
     }
   }
-  return { finished: false, steps, final_answer: null };
+  return { finished: false, final_answer: null };
 }
