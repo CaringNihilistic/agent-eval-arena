@@ -358,7 +358,11 @@ export function HallScene() {
           <>
             <span className="deco-label block text-ornament">Wrenfield Hall</span>
             <span className="block text-sm text-text-secondary">
-              Try the front door or the west window. Each leads to a game.
+              Try the front door for the main game: two answers to one task, the names hidden, and
+              you say which is better.
+            </span>
+            <span className="mt-1 block text-sm text-text-secondary">
+              Try the west window for a ten-round challenge, played for points.
             </span>
           </>
         )}

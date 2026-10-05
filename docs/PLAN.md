@@ -216,7 +216,9 @@ The answer buttons ("Trust letter A", "It holds", and the rest) and the stored a
 
 **Tests.** 247 unit, component, and service tests (five of them against Postgres). New ones: a closed room deals nothing and answers 410; a decision made in one still reveals; the Hall has exactly the open rooms; a closed distinction is kept but not offered; the reveal says a vote counted only when it did. The Playwright suite is six tests: the landing page and one click to the table, the Hall by keyboard, a Drawing Room round, the three redirects and the refusal to deal, a Weekend, and the Record and Casebook.
 
-**Not done.** The README's GIF still shows the old landing page. The live site changes when the owner deploys this commit; the Playwright suite has not been run against the live site since.
+**After the checkpoint (2026-10-06).** The commit deployed, and the Playwright suite passed 6 of 6 against https://agent-eval-arena.vercel.app/. The README's GIF was recorded again from the new pages: the landing page, then one Drawing Room round on a writing task, 29 seconds, 5.0 MB. The Hall caption's resting text now names what each of the two ways in leads to, which also fills the height the caption keeps so that nothing moves when a part is pointed at.
+
+**Not done.** The test's decisions are still in the live database, from this run and probably from the run on 2026-10-03: the Official Record showed 4 comparisons (1 from the Drawing Room, 3 from the Library) straight after the run. `db:clean-e2e` needs Neon's connection string, which is in Vercel's settings and not on the development machine. Until it is run, those test votes count toward the players' ranking.
 
 ## 1. What we're building
 
