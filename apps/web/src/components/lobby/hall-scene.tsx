@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { room } from "@/lib/rooms";
-import { MODE_NAMES, type Mode } from "@/lib/types";
+import { MODE_NAMES, type PlayableMode } from "@/lib/types";
 
 /** A CSS custom property for an animation delay or period, which React's style type does not know. */
 function timing(values: Record<string, string>): CSSProperties {
@@ -75,10 +75,10 @@ function HallSpot({
   onActive,
   children,
 }: {
-  mode: Mode;
+  mode: PlayableMode;
   halo: ReactNode;
   active: boolean;
-  onActive: (mode: Mode | null) => void;
+  onActive: (mode: PlayableMode | null) => void;
   children: ReactNode;
 }) {
   const { href, place } = room(mode);
@@ -102,13 +102,13 @@ function HallSpot({
 }
 
 /**
- * Wrenfield Hall at night, with a letter being written in the foreground. Five
- * parts of the picture lead to the five rooms: the door, two windows, the tower
- * clock, and the post box. Each is a real link, reachable by keyboard, and the
- * caption underneath says where it goes.
+ * Wrenfield Hall at night, with a letter being written in the foreground. Two
+ * parts of the picture lead to the two open rooms: the front door and the west
+ * window. Each is a real link, reachable by keyboard, and the caption
+ * underneath says where it goes.
  */
 export function HallScene() {
-  const [active, setActive] = useState<Mode | null>(null);
+  const [active, setActive] = useState<PlayableMode | null>(null);
 
   const shown = active ? room(active) : null;
 
@@ -118,7 +118,7 @@ export function HallScene() {
         <svg
           viewBox="0 0 640 470"
           role="group"
-          aria-label="Wrenfield Hall at night. The door, two windows, the clock, and the post box each lead to a room."
+          aria-label="Wrenfield Hall at night. The front door and the lit west window each lead to a game."
           className="scene stepped block h-auto w-full"
         >
           {/* Night sky */}
@@ -193,12 +193,12 @@ export function HallScene() {
           <Pane x={364} y={184} width={26} height={38} delay={1.7} />
           <Pane x={307} y={184} width={26} height={38} delay={0.2} />
 
-          {/* The five ways in. Their order here is the order Tab reaches them in, and it matches
-              the list of rooms below the picture. None overlaps another, so paint order is free. */}
-          {/* A Weekend at Wrenfield: the front door */}
+          {/* The two ways in. Their order here is the order Tab reaches them in, and it matches
+              the list of rooms below the picture. Neither overlaps the other, so paint order is free. */}
+          {/* The Drawing Room, the main game: the front door */}
           <HallSpot
-            mode="weekend"
-            active={active === "weekend"}
+            mode="drawing_room"
+            active={active === "drawing_room"}
             onActive={setActive}
             halo={<rect x="266" y="240" width="108" height="110" />}
           >
@@ -222,10 +222,10 @@ export function HallScene() {
             <circle cx="326" cy="308" r="2" className="fill-ink" />
           </HallSpot>
 
-          {/* The Drawing Room: the west window */}
+          {/* A Weekend at Wrenfield: the west window */}
           <HallSpot
-            mode="drawing_room"
-            active={active === "drawing_room"}
+            mode="weekend"
+            active={active === "weekend"}
             onActive={setActive}
             halo={<rect x="106" y="242" width="60" height="70" />}
           >
@@ -233,28 +233,17 @@ export function HallScene() {
             <path d="M118 306 q18 -22 36 0" className="fill-none stroke-ink" strokeWidth="2" />
           </HallSpot>
 
-          {/* The Library: the east window */}
-          <HallSpot
-            mode="library"
-            active={active === "library"}
-            onActive={setActive}
-            halo={<rect x="474" y="242" width="60" height="70" />}
-          >
+          {/* The east window, the tower clock, and the post box led to rooms that have closed.
+              They are scenery now. */}
+          <g>
             <Pane x={480} y={248} width={48} height={58} delay={1.1} />
             <path
               d="M486 300 v-16 h6 v16 M494 300 v-22 h6 v22 M502 300 v-13 h6 v13 M512 300 v-19 h6 v19"
               className="fill-none stroke-ink"
               strokeWidth="2"
             />
-          </HallSpot>
-
-          {/* Does the Timetable Hold?: the tower clock */}
-          <HallSpot
-            mode="timetable"
-            active={active === "timetable"}
-            onActive={setActive}
-            halo={<circle cx="320" cy="98" r="26" />}
-          >
+          </g>
+          <g>
             <circle
               cx="320"
               cy="98"
@@ -282,15 +271,8 @@ export function HallScene() {
               style={{ transformOrigin: "320px 98px", ...timing({ "--period": "480s" }) }}
             />
             <circle cx="320" cy="98" r="2.5" className="fill-stamp" />
-          </HallSpot>
-
-          {/* The Morning Post: the post box by the drive */}
-          <HallSpot
-            mode="morning_post"
-            active={active === "morning_post"}
-            onActive={setActive}
-            halo={<rect x="556" y="322" width="46" height="64" />}
-          >
+          </g>
+          <g>
             <rect
               x="574"
               y="356"
@@ -308,7 +290,7 @@ export function HallScene() {
               strokeWidth="2"
             />
             <rect x="569" y="338" width="20" height="4" className="fill-ink" />
-          </HallSpot>
+          </g>
 
           {/* In the foreground: a letter being written */}
           <g transform="translate(34 368) rotate(-5)">
@@ -376,8 +358,7 @@ export function HallScene() {
           <>
             <span className="deco-label block text-ornament">Wrenfield Hall</span>
             <span className="block text-sm text-text-secondary">
-              Try the front door, the lit windows, the tower clock, and the post box. Each leads to
-              a room.
+              Try the front door or the west window. Each leads to a game.
             </span>
           </>
         )}

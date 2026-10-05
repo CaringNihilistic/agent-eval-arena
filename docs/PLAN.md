@@ -1,6 +1,6 @@
 # Agent Eval Arena: Plan
 
-Status: revised 2026-10-03. Checkpoints B and B2 are complete: 270 runs are recorded (three of every model on every task) and the Poison Pen game (Section 0.1) works locally in all five modes. Checkpoint C (launch, Section 0.2) is done: the site is live at https://agent-eval-arena.vercel.app/ and the Playwright suite passed against it on 2026-10-03. **Sections 0, 0.1, and 0.2 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
+Status: revised 2026-10-05. Checkpoint D (Section 0.3) closed three of the five modes and rewrote the landing page in plain words; where Section 0.3 disagrees with Sections 0.1 and 0.2 on which rooms are open, the pages, or the wording, Section 0.3 wins. Earlier status, 2026-10-03: Checkpoints B and B2 are complete: 270 runs are recorded (three of every model on every task) and the Poison Pen game (Section 0.1) works locally in all five modes. Checkpoint C (launch, Section 0.2) is done: the site is live at https://agent-eval-arena.vercel.app/ and the Playwright suite passed against it on 2026-10-03. **Sections 0, 0.1, 0.2, and 0.3 are the current design.** Later sections were written for an earlier shape of the project (four free-tier configs, a Python run store, live mode); where they disagree with Section 0, Section 0 wins, and the sections that no longer apply are marked.
 
 Where this plan departs from the brief, the departure is listed in [Section 12](#12-deviations-from-the-brief) and the reason is in `DECISIONS.md`.
 
@@ -162,6 +162,61 @@ Requested by the owner on 2026-10-03. No new features; checks, fixes, deployment
 - `E2E_BASE_URL=<url> pnpm --filter web e2e` runs the same Playwright suite against a deployed site, with no local build or database.
 
 **README.** For the public repository: a GIF of the Hall and one Drawing Room round, the pitch, how it works, the measured results with ranges, the findings, placeholders for the vote-based findings, how to run it locally, and the known limits.
+
+## 0.3 Checkpoint D: two rooms, and a front page that says what this is
+
+Requested by the owner on 2026-10-05: make the site easy to understand, trim the modes, and get a visitor straight into the game. Where this section disagrees with Sections 0.1 and 0.2, this section wins. The recordings, the scorers, the fairness rules, redaction, points, and every stored field are unchanged.
+
+**What was wrong.**
+
+- The landing page never said "AI". It opened with the fiction and facts such as "30 matters"; a visitor had to reach the footer to learn that three Claude models were being compared.
+- There were thirteen ways in before a round was played: two buttons, five room cards, five parts of the Hall picture, and no header link that said "Play".
+- The main button led to A Weekend at Wrenfield, whose votes never count toward the players' ranking. The ranking needs 30 Drawing Room or Library votes, and the front page steered visitors away from both.
+- The wording was in costume: "the matter at hand", "does the timetable hold?", "one author, two seats". The reveal was titled "The Gathering in the Library", next to a mode called "The Library Gathering".
+
+**Two rooms are open.**
+
+| Room                   | Role                                                                     | Counts toward Elo |
+| ---------------------- | ------------------------------------------------------------------------ | ----------------- |
+| The Drawing Room       | The main game: one `duel` at a time, about 1 in 8 a trap. The front door | Yes, except traps |
+| A Weekend at Wrenfield | The ten-round challenge for points, unchanged. The west window           | No                |
+
+`PLAYABLE_MODES` in `types.ts` lists them. `ROOMS`, the Hall picture, the header, and `RoundTable` take only a playable mode.
+
+**Three rooms are closed, not deleted.** The Library Gathering, Does the Timetable Hold?, and The Morning Post.
+
+- `nextRound` answers 410 for a closed room, so no new round is dealt there. The rule is in the service, not the route.
+- Their names stay in `MODES`, and `resolveRound` still rebuilds their round ids. A decision made there still reveals by its id, still counts toward the player's points and rank, and a Library ranking still counts toward Elo (`ELO_MODES` is unchanged). The live database holds such decisions, and deleting the modes would orphan them.
+- A round of a closed room that is opened by its id can still be decided. The ids are content hashes, so this is reachable only by someone who builds one by hand; the decision is an honest one and is stored like any other.
+- The leak tests still cover all five modes, because all five can still be served blind by id.
+- `/library`, `/timetable`, and `/morning-post` redirect (307) to `/drawing-room`.
+- "Master of the Library" can no longer be earned. It is kept by a player who has it and is not offered to one who does not (`CLOSED_DISTINCTIONS`).
+- The Weekend keeps its three hold-or-fall rounds. Changing its round mix would change what every existing seed and challenge link deals.
+
+**The landing page.** In this order: one line saying it is a blind test of three AI models; the three models named, and what the visitor will do; one line on the country-house setting; one primary button, "Play now", into the Drawing Room, with a text link to the ten-round challenge; three figures (3 AI models, 30 tasks each, 270 recorded answers); the Hall picture, whose front door and west window are the two links, with the east window, the clock, and the post box left as scenery; "How it works" in three steps; the two rooms; the guests. "Your standing" is shown only to a visitor who has made a decision.
+
+**The header** is Play, Results (The Official Record), My Casebook, About.
+
+**Wording in the game.** The theme stays; the question is asked plainly.
+
+| Before                                | After                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| The matter at hand                    | The task                                                               |
+| Which letter do you trust?            | Which letter answers the task better?                                  |
+| Accuse: one author, two seats         | Accuse: the same model wrote both                                      |
+| Who wrote this letter?                | Which AI model wrote this letter?                                      |
+| Does the timetable hold?              | Does this letter hold up? It holds if it keeps every rule the task set |
+| The Gathering in the Library (reveal) | The reveal: Who wrote them                                             |
+| X% of sleuths trusted the same letter | X% of players trusted the same letter                                  |
+| The next letter                       | Next round                                                             |
+
+The answer buttons ("Trust letter A", "It holds", and the rest) and the stored answers are unchanged. Confidence is still chosen before every submission: every decision must store it, and a preselected level would bias it.
+
+**The reveal says when a vote counted.** After a Drawing Room preference that was not a trap: "Your vote has been added to the players' ranking of the three models." It is not shown for a trap, an accusation, or a Weekend round, none of which count.
+
+**Tests.** 247 unit, component, and service tests (five of them against Postgres). New ones: a closed room deals nothing and answers 410; a decision made in one still reveals; the Hall has exactly the open rooms; a closed distinction is kept but not offered; the reveal says a vote counted only when it did. The Playwright suite is six tests: the landing page and one click to the table, the Hall by keyboard, a Drawing Room round, the three redirects and the refusal to deal, a Weekend, and the Record and Casebook.
+
+**Not done.** The README's GIF still shows the old landing page. The live site changes when the owner deploys this commit; the Playwright suite has not been run against the live site since.
 
 ## 1. What we're building
 
@@ -704,6 +759,7 @@ The original ten phases were regrouped into checkpoints on 2026-10-02.
 | Checkpoint B  | Three configs; blind view hides thinking and time; `arena record`; all 90 runs recorded; replay site with matches, blind voting, reveal with official benchmarks, three-ranking leaderboard, `/about`; votes and rate limits in Postgres                      | Done        |
 | Checkpoint B2 | "Poison Pen": second runs recorded (180 in all); five modes; guests and seats dealt at random; accusations, confidence, traps; reveal; points, ranks, distinctions, Casebook, challenges; costume and position bias; the theme; Playwright test of every mode | Done        |
 | Checkpoint C  | Launch: final accessibility and speed checks, the step-count leak closed, the leaderboard minimum, database scripts, Playwright against a live URL, the README with measured results, deployment instructions (Section 0.2)                                   | Done        |
+| Checkpoint D  | Two rooms open and three closed (not deleted); the landing page in plain words with one way in; plain wording in the game; the reveal says when a vote counted (Section 0.3)                                                                                  | Done        |
 | Next          | Proper guest illustrations; graph view and run permalinks if still wanted                                                                                                                                                                                     | Not started |
 
 Checkpoint B acceptance, all met: every recorded match is served blind with no withheld field or identifying string (tested over all 90); a vote is stored once per voter per match with both sides' pass state and answer lengths; rate-limit counters persist across a restart (tested against Postgres); Elo matches hand-computed examples and the bootstrap is deterministic under a fixed seed; a model answer containing `<script>` or `onerror` renders as text; a browser walkthrough of start, replay, vote, reveal, and leaderboard works locally.

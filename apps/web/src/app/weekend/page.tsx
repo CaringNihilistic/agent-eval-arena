@@ -8,9 +8,9 @@ export default async function WeekendPage({ searchParams }: PageProps<"/weekend"
   const { seed } = await searchParams;
   return (
     <ModePage mode="weekend" seed={typeof seed === "string" ? seed : null}>
-      Ten rounds, three candles. Name the author of a letter, spot one author in two seats, and call
-      whether an answer will hold. A wrong answer blows a candle out; lose all three and the weekend
-      ends.
+      Ten rounds, three candles. Guess which AI model wrote a letter, spot the same model writing
+      two letters, and call whether an answer passed its checks. A wrong answer blows a candle out;
+      lose all three and the weekend ends.
     </ModePage>
   );
 }

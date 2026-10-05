@@ -3,15 +3,29 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
-import { Label, Parchment } from "@/components/theme/ornament";
+import { Label, Parchment, Title } from "@/components/theme/ornament";
+import type { Casebook } from "@/lib/casebook";
 import { fetchProfile } from "@/lib/client-api";
 
-/** The player's rank and distinctions, from their own decisions. */
-export function RankCard() {
+/**
+ * The lobby's "Your standing" section: the player's rank and distinctions, from
+ * their own decisions. A first-time visitor has none, so for them it is absent:
+ * the page should say what the game is before it talks about ranks.
+ */
+export function Standing() {
   const profile = useQuery({ queryKey: ["profile"], queryFn: fetchProfile });
-  if (profile.isPending) return <p role="status">Consulting the visitors&apos; book…</p>;
-  if (profile.isError) return <p role="alert">{profile.error.message}</p>;
-  const casebook = profile.data;
+  if (!profile.data || profile.data.decisions === 0) return null;
+  return (
+    <section aria-labelledby="standing" className="flex flex-col gap-5">
+      <Title as="h2">
+        <span id="standing">Your standing</span>
+      </Title>
+      <RankCard casebook={profile.data} />
+    </section>
+  );
+}
+
+function RankCard({ casebook }: { casebook: Casebook }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
       <Parchment as="section" aria-label="Your rank" className="flex flex-col gap-2">

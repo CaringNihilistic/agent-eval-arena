@@ -7,9 +7,10 @@ export const metadata: Metadata = { title: "The Drawing Room · Poison Pen" };
 export default function DrawingRoomPage() {
   return (
     <ModePage mode="drawing_room">
-      Two letters on one matter. Trust the better one, call them equal, or trust neither. If you
-      think one author wrote both, accuse: fifty points if you are right, thirty lost if you are
-      not. A preference earns no points; it goes on the Official Record.
+      Two AI models answered the task below. Their names are hidden. Say which letter answers it
+      better, call them equal, or trust neither, then see who wrote each. About one round in eight
+      is a trick: the same model wrote both. Accuse it for fifty points if you are right, thirty
+      lost if you are not.
     </ModePage>
   );
 }

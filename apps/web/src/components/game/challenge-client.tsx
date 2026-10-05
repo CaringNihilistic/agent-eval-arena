@@ -59,8 +59,8 @@ export function ChallengeClient({ id }: { id: string }) {
       ) : (
         <Panel>
           <p>
-            A fellow sleuth has played these ten rounds and dares you to do better. You will see
-            both results when you finish.
+            Another player has played these ten rounds and dares you to do better. You will see both
+            results when you finish.
           </p>
         </Panel>
       )}

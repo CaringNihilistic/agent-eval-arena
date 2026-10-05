@@ -83,6 +83,18 @@ export function isMode(value: unknown): value is Mode {
   return typeof value === "string" && (MODES as readonly string[]).includes(value);
 }
 
+/**
+ * The modes a player can be dealt a round in. The other three were closed on
+ * 2026-10-05: their names stay in `MODES` because decisions made in them are
+ * kept, still reveal by round id, and (for the Library) still count toward Elo.
+ */
+export const PLAYABLE_MODES = ["drawing_room", "weekend"] as const;
+export type PlayableMode = (typeof PLAYABLE_MODES)[number];
+
+export function isPlayableMode(value: unknown): value is PlayableMode {
+  return typeof value === "string" && (PLAYABLE_MODES as readonly string[]).includes(value);
+}
+
 export const MODE_NAMES: Record<Mode, string> = {
   drawing_room: "The Drawing Room",
   library: "The Library Gathering",

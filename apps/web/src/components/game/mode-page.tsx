@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { RoundTable } from "@/components/game/round-table";
 import { Title } from "@/components/theme/ornament";
 import { EARLY_ROUND_KEY, VOTER_KEY } from "@/lib/client-api";
-import { MODE_NAMES, type Mode } from "@/lib/types";
+import { MODE_NAMES, type PlayableMode } from "@/lib/types";
 
 /**
  * Asks for the first round while the page's scripts are still loading, so the
@@ -11,7 +11,7 @@ import { MODE_NAMES, type Mode } from "@/lib/types";
  * request where the table will pick it up (see `fetchNextRound`). If anything
  * here fails, the table simply asks again in the usual way.
  */
-function earlyRound(mode: Mode, seed: string | null): string {
+function earlyRound(mode: PlayableMode, seed: string | null): string {
   const request = JSON.stringify({ mode, seed });
   return `(function(){try{
 var k=${JSON.stringify(VOTER_KEY)},id=localStorage.getItem(k);
@@ -26,7 +26,7 @@ export function ModePage({
   seed = null,
   children,
 }: {
-  mode: Mode;
+  mode: PlayableMode;
   seed?: string | null;
   /** How the mode is played, in a sentence or two. */
   children: ReactNode;

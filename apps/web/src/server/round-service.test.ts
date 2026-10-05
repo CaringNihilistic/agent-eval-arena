@@ -2,9 +2,15 @@
 // Every mode, played through the service against the real recordings.
 import { describe, expect, it } from "vitest";
 
-import { morningPostNumber, morningPostRoundId, weekendRoundId } from "@/lib/rounds";
+import { morningPostNumber, morningPostRoundId, pickFree, weekendRoundId } from "@/lib/rounds";
 import { randomFor } from "@/lib/seed";
-import type { Answer, BlindRound, Mode, RevealedRound } from "@/lib/types";
+import {
+  PLAYABLE_MODES,
+  type Answer,
+  type BlindRound,
+  type Mode,
+  type RevealedRound,
+} from "@/lib/types";
 import {
   casebookFor,
   challengeView,
@@ -123,6 +129,19 @@ function resolve(roundId: string, voterId: string) {
 }
 function isTrap(round: BlindRound): boolean {
   return planOf(round.round_id).content.trap;
+}
+
+/**
+ * A round of a room that has closed. The service no longer deals these, so the
+ * test picks one and opens it by its id, as a player holding an old round would.
+ */
+async function closedRound(
+  store: MemoryStore,
+  mode: "library" | "timetable",
+  random?: () => number,
+): Promise<BlindRound> {
+  const id = pickFree(catalog, mode, new Set(), random);
+  return (await roundView(recordings, store, id!, ME)) as BlindRound;
 }
 
 describe("redaction in every mode", () => {
@@ -346,15 +365,15 @@ describe("The Drawing Room", () => {
   });
 });
 
-describe("The Library Gathering", () => {
+describe("The Library Gathering (closed: old rounds only)", () => {
   it("deals all three authors' letters and takes a ranking for no points", async () => {
     const store = memoryStore();
-    const { round } = await nextRound(recordings, store, { voterId: ME, mode: "library" });
+    const round = await closedRound(store, "library");
     expect(round).toMatchObject({ kind: "ranking", mode: "library" });
-    expect(round!.letters.map((letter) => letter.seat)).toEqual(["A", "B", "C"]);
-    expect(new Set(round!.letters.map((letter) => letter.guest)).size).toBe(3);
+    expect(round.letters.map((letter) => letter.seat)).toEqual(["A", "B", "C"]);
+    expect(new Set(round.letters.map((letter) => letter.guest)).size).toBe(3);
 
-    const reveal = await play(store, round!.round_id, { type: "ranking", order: ["C", "A", "B"] });
+    const reveal = await play(store, round.round_id, { type: "ranking", order: ["C", "A", "B"] });
 
     expect(reveal).toMatchObject({ outcome: "none", points: 0, trap: false, crowd: null });
     expect(new Set(reveal.letters.map((letter) => letter.model)).size).toBe(3);
@@ -365,32 +384,32 @@ describe("The Library Gathering", () => {
 
   it("does not take an accusation: all three authors are always present", async () => {
     const store = memoryStore();
-    const { round } = await nextRound(recordings, store, { voterId: ME, mode: "library" });
+    const round = await closedRound(store, "library");
 
-    expect(await status(play(store, round!.round_id, { type: "accuse" }))).toBe(400);
+    expect(await status(play(store, round.round_id, { type: "accuse" }))).toBe(400);
     expect(store.rows).toHaveLength(0);
   });
 
   it("rejects a ranking that is not each letter once", async () => {
     const store = memoryStore();
-    const { round } = await nextRound(recordings, store, { voterId: ME, mode: "library" });
+    const round = await closedRound(store, "library");
 
     expect(
-      await status(play(store, round!.round_id, { type: "ranking", order: ["A", "A", "B"] })),
+      await status(play(store, round.round_id, { type: "ranking", order: ["A", "A", "B"] })),
     ).toBe(400);
-    expect(await status(play(store, round!.round_id, { type: "trust", choice: "A" }))).toBe(400);
+    expect(await status(play(store, round.round_id, { type: "trust", choice: "A" }))).toBe(400);
   });
 });
 
-describe("Does the Timetable Hold?", () => {
+describe("Does the Timetable Hold? (closed: old rounds only)", () => {
   it("deals one letter with its answer shown, and scores the call", async () => {
     const store = memoryStore();
-    const { round } = await nextRound(recordings, store, { voterId: ME, mode: "timetable" });
+    const round = await closedRound(store, "timetable");
     expect(round).toMatchObject({ kind: "timetable", mode: "timetable" });
-    expect(round!.letters).toHaveLength(1);
-    expect(round!.letters[0].final_answer).not.toBeNull();
+    expect(round.letters).toHaveLength(1);
+    expect(round.letters[0].final_answer).not.toBeNull();
 
-    const right = await play(store, round!.round_id, answerFor(round!, true));
+    const right = await play(store, round.round_id, answerFor(round, true));
 
     expect(right).toMatchObject({ outcome: "right", points: 40 });
     expect(right.letters[0].score).not.toBeNull();
@@ -403,12 +422,8 @@ describe("Does the Timetable Hold?", () => {
     let held = 0;
     const deals = 1000;
     for (let deal = 0; deal < deals; deal += 1) {
-      const { round } = await nextRound(recordings, store, {
-        voterId: ME,
-        mode: "timetable",
-        random,
-      });
-      const run = runs.get(seatedRuns(round!)[0])!;
+      const round = await closedRound(store, "timetable", random);
+      const run = runs.get(seatedRuns(round)[0])!;
       if (run.passed ?? run.checks_met === run.checks_total) held += 1;
     }
 
@@ -419,10 +434,10 @@ describe("Does the Timetable Hold?", () => {
 
   it("gives nothing for the wrong call, and does not offer an accusation", async () => {
     const store = memoryStore();
-    const { round } = await nextRound(recordings, store, { voterId: ME, mode: "timetable" });
+    const round = await closedRound(store, "timetable");
 
-    expect(await status(play(store, round!.round_id, { type: "accuse" }))).toBe(400);
-    expect(await play(store, round!.round_id, answerFor(round!, false))).toMatchObject({
+    expect(await status(play(store, round.round_id, { type: "accuse" }))).toBe(400);
+    expect(await play(store, round.round_id, answerFor(round, false))).toMatchObject({
       outcome: "wrong",
       points: 0,
     });
@@ -581,42 +596,22 @@ describe("A Weekend at Wrenfield", () => {
   });
 });
 
-describe("The Morning Post", () => {
-  it("deals today's five rounds, the same for everyone, and ends with a share text", async () => {
+describe("The Morning Post (closed: old rounds only)", () => {
+  it("lets an edition be read and finished by its round ids, the same for everyone", async () => {
     const store = memoryStore();
     const number = morningPostNumber(NOW);
-    const mine: string[] = [];
-    for (;;) {
-      const dealt = await nextRound(recordings, store, {
-        voterId: ME,
-        mode: "morning_post",
-        now: NOW,
-      });
-      if (dealt.round === null) {
-        expect(dealt.game).toMatchObject({ over: true, number });
-        break;
-      }
-      mine.push(dealt.round.round_id);
-      const index = dealt.round.game!.next;
-      await play(store, dealt.round.round_id, answerFor(dealt.round, index !== 2));
+    const ids = [0, 1, 2, 3, 4].map((index) => morningPostRoundId(number, index));
+    let last: RevealedRound | null = null;
+    for (const [index, id] of ids.entries()) {
+      const round = (await roundView(recordings, store, id, ME)) as BlindRound;
+      expect(round.game).toMatchObject({ type: "morning_post", number, next: index });
+      last = await play(store, id, answerFor(round, index !== 2));
     }
-    const friend = await nextRound(recordings, store, {
-      voterId: FRIEND,
-      mode: "morning_post",
-      now: NOW,
-    });
-    const state = (
-      await nextRound(recordings, store, { voterId: ME, mode: "morning_post", now: NOW })
-    ).game;
+    const mine = (await roundView(recordings, memoryStore(), ids[0], ME)) as BlindRound;
+    const friends = (await roundView(recordings, memoryStore(), ids[0], FRIEND)) as BlindRound;
 
-    expect(mine).toEqual([0, 1, 2, 3, 4].map((index) => morningPostRoundId(number, index)));
-    expect(friend.round?.round_id).toBe(mine[0]);
-    expect(friend.round?.letters.map((l) => l.guest)).toEqual(
-      ((await roundView(recordings, memoryStore(), mine[0], ME)) as BlindRound).letters.map(
-        (l) => l.guest,
-      ),
-    );
-    expect(state?.type === "morning_post" && state.share_text).toBe(
+    expect(friends.letters.map((l) => l.guest)).toEqual(mine.letters.map((l) => l.guest));
+    expect(last?.game?.type === "morning_post" && last.game.share_text).toBe(
       `Poison Pen · Morning Post No. ${number} ■■□■■`,
     );
   });
@@ -635,22 +630,28 @@ describe("The Morning Post", () => {
     ).toBe(409);
     expect(await status(play(store, morningPostRoundId(number, 2), { type: "accuse" }))).toBe(409);
   });
+});
 
-  it("deals a different edition the next day", async () => {
+describe("rooms that have closed", () => {
+  it("deals no new round in the Library, the Timetable, or the Morning Post", async () => {
     const store = memoryStore();
-    const tomorrow = new Date(NOW.getTime() + 86_400_000);
-    const today = await nextRound(recordings, store, {
-      voterId: ME,
-      mode: "morning_post",
-      now: NOW,
-    });
-    const next = await nextRound(recordings, store, {
-      voterId: ME,
-      mode: "morning_post",
-      now: tomorrow,
-    });
+    for (const mode of ["library", "timetable", "morning_post"] as const) {
+      expect(await status(nextRound(recordings, store, { voterId: ME, mode, now: NOW }))).toBe(410);
+    }
+    for (const mode of PLAYABLE_MODES) {
+      expect((await nextRound(recordings, store, { voterId: ME, mode })).round).not.toBeNull();
+    }
+    expect(store.rows).toHaveLength(0);
+  });
 
-    expect(next.round?.round_id).not.toBe(today.round?.round_id);
+  it("still reveals a decision made there before it closed", async () => {
+    const store = memoryStore();
+    const round = await closedRound(store, "library");
+    await play(store, round.round_id, { type: "ranking", order: ["A", "B", "C"] });
+
+    const again = await roundView(recordings, store, round.round_id, ME);
+
+    expect(again.decided && again.your_answer).toEqual({ type: "ranking", order: ["A", "B", "C"] });
   });
 });
 

@@ -27,6 +27,15 @@ const nextConfig: NextConfig = {
     // The portrait files, so /api/art can see which exist once deployed.
     "/api/art": ["./public/guests/**"],
   },
+  // Three rooms closed on 2026-10-05. Their addresses lead to the main game.
+  // Temporary, so a browser does not remember it if a room reopens.
+  async redirects() {
+    return ["/library", "/timetable", "/morning-post"].map((source) => ({
+      source,
+      destination: "/drawing-room",
+      permanent: false,
+    }));
+  },
 };
 
 export default nextConfig;

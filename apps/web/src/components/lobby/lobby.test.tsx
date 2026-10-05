@@ -10,7 +10,7 @@ import { GuestRow } from "@/components/lobby/guest-row";
 import { HallScene } from "@/components/lobby/hall-scene";
 import { Reveal } from "@/components/lobby/reveal";
 import { ROOMS } from "@/lib/rooms";
-import { MODES } from "@/lib/types";
+import { PLAYABLE_MODES } from "@/lib/types";
 
 vi.mock("@/lib/client-api", () => ({ fetchArt: async () => ({}) }));
 
@@ -19,18 +19,15 @@ function show(ui: ReactElement) {
 }
 
 describe("the picture of Wrenfield Hall", () => {
-  it("has a part of the Hall that leads to every room", () => {
+  it("has a part of the Hall that leads to every open room, and to no closed one", () => {
     show(<HallScene />);
 
-    expect(ROOMS.map((room) => room.mode).sort()).toEqual([...MODES].sort());
+    expect(ROOMS.map((room) => room.mode)).toEqual([...PLAYABLE_MODES]);
     const links = screen.getAllByRole("link");
-    // In the order Tab reaches them: the main game first, then the rooms as listed.
+    // In the order Tab reaches them: the main game first, then the challenge.
     expect(links.map((link) => link.getAttribute("aria-label"))).toEqual([
-      "The front door: A Weekend at Wrenfield",
-      "The west window: The Drawing Room",
-      "The east window: The Library Gathering",
-      "The tower clock: Does the Timetable Hold?",
-      "The post box: The Morning Post",
+      "The front door: The Drawing Room",
+      "The west window: A Weekend at Wrenfield",
     ]);
     expect(links.map((link) => link.getAttribute("href"))).toEqual(ROOMS.map((room) => room.href));
   });
@@ -39,21 +36,21 @@ describe("the picture of Wrenfield Hall", () => {
     const user = userEvent.setup();
     show(<HallScene />);
     const caption = screen.getByTestId("hall-caption");
-    const clock = screen.getByRole("link", { name: "The tower clock: Does the Timetable Hold?" });
+    const window = screen.getByRole("link", { name: "The west window: A Weekend at Wrenfield" });
 
     expect(caption).toHaveTextContent("Try the front door");
-    await user.hover(clock);
-    expect(caption).toHaveTextContent("The tower clock");
-    expect(caption).toHaveTextContent("Does the Timetable Hold?");
-    expect(clock).toHaveAttribute("data-active", "true");
-    await user.unhover(clock);
-    expect(caption).toHaveTextContent("Try the front door");
-
-    // The first stop for a keyboard is the front door.
-    await user.tab();
+    await user.hover(window);
+    expect(caption).toHaveTextContent("The west window");
     expect(caption).toHaveTextContent("A Weekend at Wrenfield");
+    expect(window).toHaveAttribute("data-active", "true");
+    await user.unhover(window);
+    expect(caption).toHaveTextContent("Try the front door");
+
+    // The first stop for a keyboard is the front door, which is the main game.
     await user.tab();
     expect(caption).toHaveTextContent("The Drawing Room");
+    await user.tab();
+    expect(caption).toHaveTextContent("A Weekend at Wrenfield");
   });
 
   it("describes the picture to someone who cannot see it", () => {

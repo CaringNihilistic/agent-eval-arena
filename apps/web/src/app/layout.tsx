@@ -18,7 +18,7 @@ const josefin = Josefin_Sans({ variable: "--font-josefin", weight: "600", subset
 export const metadata: Metadata = {
   title: "Poison Pen: A Wrenfield Hall Mystery",
   description:
-    "Unsigned letters appear at dinner. Three authors wrote them; six guests carry them. Decide which to trust, and unmask the author.",
+    "A blind test of three AI models, played as a country-house mystery. Read two unsigned answers to the same task, say which is better, then see which Claude model wrote each.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -121,14 +121,13 @@ function round(changes: Partial<RevealedRound> = {}): RevealedRound {
   };
 }
 
-describe("The Gathering in the Library", () => {
+describe("the reveal", () => {
   it("unmasks each letter's author and shows the round's figures and the 30-task totals", () => {
     show(<RevealPanel round={round()} />);
     const first = screen.getByRole("article", { name: "Letter A" });
 
-    expect(
-      screen.getByRole("heading", { name: "The Gathering in the Library" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "The reveal" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Who wrote them" })).toBeInTheDocument();
     expect(within(first).getByText("claude-opus-5-5")).toBeInTheDocument();
     expect(within(first).getByText(/53 words/)).toBeInTheDocument();
     expect(within(first).getByText(/\$0\.0042 at API rates/)).toBeInTheDocument();
@@ -160,17 +159,35 @@ describe("The Gathering in the Library", () => {
     expect(screen.getByText(/no points are given for a preference/)).toBeInTheDocument();
   });
 
+  it("says a Drawing Room preference was added to the players' ranking", () => {
+    show(<RevealPanel round={round()} />);
+
+    expect(screen.getByTestId("vote-counted")).toHaveTextContent("added to the players' ranking");
+  });
+
+  it("does not say so for a trap, an accusation, or a Weekend round, none of which count", () => {
+    for (const changes of [
+      { trap: true, outcome: "wrong" as const },
+      { your_answer: { type: "accuse" as const }, outcome: "wrong" as const, points: -30 },
+      { mode: "weekend" as const },
+    ]) {
+      const { unmount } = show(<RevealPanel round={round(changes)} />);
+      expect(screen.queryByTestId("vote-counted")).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it("tells the first few players they are among the first, and gives no percentage", () => {
     show(<RevealPanel round={round({ crowd: { votes: 4, same_share: null } })} />);
 
-    expect(screen.getByText("You're among the first to dine here.")).toBeInTheDocument();
-    expect(screen.queryByText(/of sleuths trusted/)).not.toBeInTheDocument();
+    expect(screen.getByText("You are among the first to judge this pair.")).toBeInTheDocument();
+    expect(screen.queryByText(/of players trusted/)).not.toBeInTheDocument();
   });
 
   it("gives the share who trusted the same letter once five have voted", () => {
     show(<RevealPanel round={round({ crowd: { votes: 5, same_share: 0.6 } })} />);
 
-    expect(screen.getByText("60% of sleuths trusted the same letter.")).toBeInTheDocument();
+    expect(screen.getByText("60% of players trusted the same letter.")).toBeInTheDocument();
     expect(screen.queryByText(/among the first/)).not.toBeInTheDocument();
   });
 
@@ -193,7 +210,7 @@ describe("The Gathering in the Library", () => {
     });
     show(<RevealPanel round={caught} />);
 
-    expect(screen.getByText("One author, two seats!")).toBeInTheDocument();
+    expect(screen.getByText("One model wrote both letters!")).toBeInTheDocument();
     expect(screen.getByTestId("points-gained")).toHaveTextContent("+50 points");
     expect(screen.getByText("Distinction: Spotted the Impostor")).toBeInTheDocument();
     expect(screen.getAllByAltText(/flustered/)).toHaveLength(2);
@@ -201,7 +218,7 @@ describe("The Gathering in the Library", () => {
 
   it("says so when the player was fooled or accused falsely", () => {
     const { unmount } = show(<RevealPanel round={round({ trap: true, outcome: "wrong" })} />);
-    expect(screen.getByText(/You were fooled: one author wrote both letters/)).toBeInTheDocument();
+    expect(screen.getByText(/You were fooled: one model wrote both letters/)).toBeInTheDocument();
     unmount();
 
     show(
@@ -209,7 +226,7 @@ describe("The Gathering in the Library", () => {
         round={round({ your_answer: { type: "accuse" }, outcome: "wrong", points: -30 })}
       />,
     );
-    expect(screen.getByText(/A false accusation: two different authors/)).toBeInTheDocument();
+    expect(screen.getByText(/A false accusation: two different models/)).toBeInTheDocument();
     expect(screen.getByTestId("points-gained")).toHaveTextContent("-30 points");
   });
 

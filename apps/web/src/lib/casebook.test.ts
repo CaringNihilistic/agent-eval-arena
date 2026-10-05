@@ -193,11 +193,27 @@ describe("the Casebook", () => {
     expect(casebook.morning_post).toEqual({ game: "mp.14", squares: "■□" });
   });
 
-  it("lists every distinction, earned or not", () => {
+  it("lists every distinction still on offer, earned or not", () => {
     const earned = casebook.distinctions.filter((d) => d.earned).map((d) => d.id);
 
-    expect(casebook.distinctions).toHaveLength(6);
+    expect(casebook.distinctions).toHaveLength(5);
     expect(earned).toEqual(["spotted_the_impostor"]);
+    // The Library has closed, so its distinction is not held out to a player who lacks it.
+    expect(casebook.distinctions.map((d) => d.id)).not.toContain("master_of_the_library");
+  });
+
+  it("keeps a closed room's distinction for a player who earned it", () => {
+    const ranked = Array.from({ length: 10 }, (_, index) =>
+      decision({
+        round_id: `lib.${index}`,
+        mode: "library",
+        kind: "ranking",
+        answer: { type: "ranking", order: ["A", "B", "C"] },
+      }),
+    );
+    const held = buildCasebook(ranked, new Map()).distinctions;
+
+    expect(held.find((d) => d.id === "master_of_the_library")?.earned).toBe(true);
   });
 
   it("can be copied as text", () => {

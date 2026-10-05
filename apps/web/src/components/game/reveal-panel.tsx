@@ -6,6 +6,7 @@ import { Panel, Title } from "@/components/theme/ornament";
 import { CROWD_MIN } from "@/lib/casebook";
 import { acrossRuns, rangeText } from "@/lib/format";
 import { guest as guestById } from "@/lib/guests";
+import { ELO_MODES } from "@/lib/leaderboard";
 import {
   CONFIDENCE_LABELS,
   type Answer,
@@ -32,7 +33,7 @@ export function answerText(answer: Answer, authors: readonly AuthorOption[]): st
           ? "You trusted neither."
           : `You trusted letter ${answer.choice}.`;
     case "accuse":
-      return "You accused: one author, two seats.";
+      return "You accused: the same model wrote both.";
     case "ranking":
       return `You ranked them ${answer.order.join(", ")}.`;
     case "author":
@@ -46,10 +47,10 @@ export function answerText(answer: Answer, authors: readonly AuthorOption[]): st
 export function verdictText(round: RevealedRound): string {
   const { your_answer: answer, outcome, trap } = round;
   if (answer.type === "accuse") {
-    if (outcome === "right") return "Quite right. One hand wrote both.";
-    return "A false accusation: two different authors wrote these.";
+    if (outcome === "right") return "Quite right. One model wrote both.";
+    return "A false accusation: two different models wrote these.";
   }
-  if (trap) return "You were fooled: one author wrote both letters.";
+  if (trap) return "You were fooled: one model wrote both letters.";
   if (outcome === "right") return "Quite right.";
   if (outcome === "wrong") return "Not so.";
   return "A matter of taste: no points are given for a preference.";
@@ -122,23 +123,29 @@ function Unmasking({
 function CrowdLine({ round }: { round: RevealedRound }) {
   const crowd = round.crowd;
   if (crowd === null) return null;
-  if (crowd.votes < CROWD_MIN) return <p>You&apos;re among the first to dine here.</p>;
+  if (crowd.votes < CROWD_MIN) return <p>You are among the first to judge this pair.</p>;
   if (crowd.same_share === null) return null;
-  return <p>{Math.round(crowd.same_share * 100)}% of sleuths trusted the same letter.</p>;
+  return <p>{Math.round(crowd.same_share * 100)}% of players trusted the same letter.</p>;
 }
 
-/** "The Gathering in the Library": shown after a decision, and only then. */
+/** Whether this decision is one the players' ranking is built from. */
+function countsTowardRanking(round: RevealedRound): boolean {
+  const preference = round.your_answer.type === "trust" || round.your_answer.type === "ranking";
+  return preference && !round.trap && ELO_MODES.includes(round.mode);
+}
+
+/** The reveal: shown after a decision, and only then. */
 export function RevealPanel({ round }: { round: RevealedRound }) {
   const models = [...new Set(round.letters.map((letter) => letter.model))];
   const progress = round.progress;
   return (
-    <section aria-label="The Gathering in the Library" className="flex flex-col gap-5">
+    <section aria-label="The reveal" className="flex flex-col gap-5">
       <Panel className="flex flex-col gap-3">
         <Title as="h2" kicker="The reveal">
-          The Gathering in the Library
+          {round.letters.length === 1 ? "Who wrote it" : "Who wrote them"}
         </Title>
         {round.trap ? (
-          <p className="deco-stamp self-start text-lg">One author, two seats!</p>
+          <p className="deco-stamp self-start text-lg">One model wrote both letters!</p>
         ) : null}
         <p className="text-lg">
           {answerText(round.your_answer, round.authors)} {verdictText(round)}
@@ -157,6 +164,11 @@ export function RevealPanel({ round }: { round: RevealedRound }) {
             </p>
           ))}
           <CrowdLine round={round} />
+          {countsTowardRanking(round) ? (
+            <p data-testid="vote-counted">
+              Your vote has been added to the players&apos; ranking of the three models.
+            </p>
+          ) : null}
         </div>
       </Panel>
 

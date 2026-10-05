@@ -8,7 +8,7 @@ The project exists to show skill in agent evaluation and observability. Correct 
 - Why things are the way they are: `docs/DECISIONS.md`
 - What was learned about models and providers, with evidence: `docs/FINDINGS.md`. Add an entry whenever a real run shows provider-specific behaviour.
 
-**Current state: Checkpoint C (launch) done. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 270 recorded runs (three of every model on every task), live at https://agent-eval-arena.vercel.app/ (Vercel Hobby, Neon Free). The Playwright suite passed against it on 2026-10-03. Its test decisions must be removed from the live database with `db:clean-e2e` after every live run. No new features. `docs/PLAN.md` Sections 0, 0.1, and 0.2 are the current design.** Update this line at the end of every checkpoint.
+**Current state: Checkpoint D (two rooms, plain-words landing page) done and pushed; not yet confirmed on the live site. The site is "Poison Pen: A Wrenfield Hall Mystery", a game over 270 recorded runs (three of every model on every task), live at https://agent-eval-arena.vercel.app/ (Vercel Hobby, Neon Free). Two rooms are open, The Drawing Room (the main game) and A Weekend at Wrenfield; the other three are closed but their decisions are kept (`PLAYABLE_MODES`, PLAN Section 0.3). The Playwright suite last passed against the live site on 2026-10-03, before Checkpoint D. Its test decisions must be removed from the live database with `db:clean-e2e` after every live run. No new features. `docs/PLAN.md` Sections 0, 0.1, 0.2, and 0.3 are the current design.** Update this line at the end of every checkpoint.
 
 ## How we work
 
@@ -62,7 +62,7 @@ pnpm lint                              # eslint + prettier check + ruff + schema
 pnpm typecheck                         # tsc + mypy (api and sandbox)
 pnpm test:web                          # vitest
 pnpm test:api                          # pytest for api and sandbox, in their containers
-pnpm test:e2e                          # Playwright: builds the site, plays every mode in Edge, own database
+pnpm test:e2e                          # Playwright: builds the site, plays both open rooms in Edge, own database
 E2E_BASE_URL=<url> pnpm --filter web e2e   # the same suite against a deployed site (no build, no local database)
 pnpm --filter web db:migrate -- --from NAME     # apply the schema to the database in env var NAME (default DATABASE_URL)
 pnpm --filter web db:clean-e2e -- --from NAME   # remove the decisions the e2e test made there
@@ -133,7 +133,8 @@ The Postgres store tests run only when `TEST_DATABASE_URL` is set (see `apps/web
 - Any new field that reveals the result, the cost, the speed, or the identity of an author must be added to the blind-view redaction and to `WITHHELD_KEYS` in the leak scan, and a new mode must be added to the every-mode leak test.
 - A check that cannot run is an error, never a failed answer: a parser timeout or an unreachable sandbox leaves the run unscored.
 - Points come only from answers that can be right or wrong. A preference earns nothing, and nothing is awarded for agreeing with other players.
-- Elo uses only preferences from The Drawing Room and The Library Gathering, never a trap round.
+- Elo uses only preferences from The Drawing Room and The Library Gathering, never a trap round. The Library is closed; the rankings made there still count.
+- A closed room deals no new round (`nextRound` answers 410), but its mode, its round ids, and its decisions stay. Do not remove a mode from `MODES` or from the every-mode leak test while the database holds decisions made in it.
 - Every decision stores its mode, kind, the guest and position of each letter, confidence, the trap flag, answer lengths, and pass state.
 - Model output is untrusted. Render it only through `AnswerView`: markdown with no raw-HTML plugin, Mermaid at the strict security level.
 - No real author's name, detective, or book title anywhere in the product; a test scans for them.

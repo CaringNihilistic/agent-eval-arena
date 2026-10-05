@@ -221,6 +221,9 @@ export const DISTINCTIONS: readonly Distinction[] = [
   },
 ];
 
+/** Distinctions whose room has closed. Kept by those who earned them, no longer offered. */
+export const CLOSED_DISTINCTIONS: ReadonlySet<string> = new Set(["master_of_the_library"]);
+
 /** The ids of the distinctions a player's decisions have earned. */
 export function earnedDistinctions(decisions: readonly DecisionRecord[]): Set<string> {
   const earned = new Set<string>();

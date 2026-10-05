@@ -115,7 +115,7 @@ function Entries({ board }: { board: LeaderboardResponse }) {
 
       <Entry
         title="Players' preference"
-        note={`Elo from ${board.votes} blind comparisons${byMode ? ` (${byMode})` : ""}: K=32, start 1000, replayed in order. Only preferences from The Drawing Room and The Library Gathering count, and never a round where one author held both seats. The range is a 95% bootstrap interval.`}
+        note={`Elo from ${board.votes} blind comparisons${byMode ? ` (${byMode})` : ""}: K=32, start 1000, replayed in order. Only preferences from The Drawing Room count (with rankings made in The Library Gathering before it closed), and never a round where one model wrote both letters. The range is a 95% bootstrap interval.`}
       >
         {board.ranking_ready ? (
           <Table

@@ -14,13 +14,13 @@ import {
   type Seat,
 } from "@/lib/types";
 
-export const ACCUSE_LABEL = "Accuse: one author, two seats";
+export const ACCUSE_LABEL = "Accuse: the same model wrote both";
 
 const QUESTIONS: Record<RoundKind, string> = {
-  duel: "Which letter do you trust?",
+  duel: "Which letter answers the task better?",
   ranking: "Rank the three letters, the one you trust most first.",
-  author: "Who wrote this letter?",
-  timetable: "Does the timetable hold?",
+  author: "Which AI model wrote this letter?",
+  timetable: "Does this letter hold up?",
 };
 
 function same(a: Answer | null, b: Answer): boolean {

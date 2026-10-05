@@ -6,6 +6,7 @@
 
 import { GUESTS, type GuestId } from "@/lib/guests";
 import {
+  CLOSED_DISTINCTIONS,
   DISTINCTIONS,
   earnedDistinctions,
   rankFor,
@@ -234,7 +235,9 @@ export function buildCasebook(
     points,
     rank: rank.name,
     next_rank: rank.next,
-    distinctions: DISTINCTIONS.map((distinction) => ({
+    distinctions: DISTINCTIONS.filter(
+      (distinction) => earned.has(distinction.id) || !CLOSED_DISTINCTIONS.has(distinction.id),
+    ).map((distinction) => ({
       ...distinction,
       earned: earned.has(distinction.id),
     })),

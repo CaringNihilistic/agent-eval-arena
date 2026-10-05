@@ -16,10 +16,8 @@ import {
 import type { Expression } from "@/lib/guests";
 import { modelTotals } from "@/lib/leaderboard";
 import {
-  isFreeMode,
   morningPostDate,
   morningPostNumber,
-  morningPostRoundId,
   newSeed,
   pickFree,
   resolveRound,
@@ -39,6 +37,7 @@ import {
 import {
   holds,
   isConfidence,
+  isPlayableMode,
   SEATS,
   type Answer,
   type AuthorOption,
@@ -354,24 +353,23 @@ export async function nextRound(
   },
 ): Promise<NextRound> {
   const { voterId, mode } = input;
+  // A closed room deals nothing new. Its old rounds still resolve by id.
+  if (!isPlayableMode(mode)) {
+    throw new ServiceError(410, "That room is closed. The Drawing Room and the Weekend are open.");
+  }
   const mine = await store.decisionsBy(voterId);
   let roundId: string | null;
   let game: GameState | null = null;
 
-  if (isFreeMode(mode)) {
+  if (mode === "drawing_room") {
     const decided = new Set(mine.map((decision) => decision.round_id));
     roundId = pickFree(recordings.catalog, mode, decided, input.random);
-  } else if (mode === "weekend") {
+  } else {
     if (input.seed && !SEED.test(input.seed))
       throw new ServiceError(400, "That is not a game seed.");
     const state = weekendState(mine, input.seed ?? newSeed(input.random));
     game = state;
     roundId = state.over ? null : weekendRoundId(state.seed, state.next);
-  } else {
-    const number = morningPostNumber(input.now ?? new Date());
-    const state = morningPostState(mine, number, morningPostDate(number));
-    game = state;
-    roundId = state.over ? null : morningPostRoundId(number, state.next);
   }
   if (roundId === null) return { round: null, game };
   const plan = requirePlan(recordings, roundId, voterId);

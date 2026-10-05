@@ -13,7 +13,7 @@ Three Claude models (Haiku 4.5, Sonnet 5.5, and Opus 5.5) each answered the same
 - **Guests are costumes, not models.** The guest beside a letter is dealt at random for every round. The function that deals seats is never given the run or its model, so a guest cannot stand for an author. Which letter is shown first is random too. Once there are enough votes, the Official Record reports whether any costume or position is trusted more than chance would explain.
 - **Traps.** About one Drawing Room round in eight shows two different runs by the same model on the same task. A player can accuse the table of "one author, two seats". A correct accusation earns points, and a wrong one loses them. Trap rounds never count toward the ranking. They measure how often players see a difference that is not there.
 - **Preferences earn no points.** "Which letter is better" has no right answer, so trusting a letter scores nothing. Points come only from answers that can be checked: naming the author (100), calling whether a letter held up to its tests or rules (40), and accusing correctly (+50, or −30 if wrong). Nothing is ever awarded for agreeing with other players. If the crowd's taste were rewarded, players would learn to vote for what they expect others to like.
-- **Five rooms.** The Drawing Room (two letters, trust one or accuse), The Library Gathering (rank three letters), Does the Timetable Hold? (did this letter pass its tests or meet its rules?), A Weekend at Wrenfield (ten rounds, three candles), and The Morning Post (five rounds a day, the same for everyone, shared as squares).
+- **Two rooms.** The Drawing Room is the main game: two letters on one task, trust one or accuse. A Weekend at Wrenfield is a ten-round challenge for points, with three candles: name the model that wrote a letter, spot one model in two seats, and call whether a letter passed its tests or met its rules. Three more rooms (rank three letters, hold or fall, and a daily five) were closed on 2026-10-05 so that a visitor meets one game, not five. The decisions made in them are kept.
 - **Only replays, no live calls.** The site reads committed recordings. No model is called while you play, and nothing on the public site can call one.
 
 ## Results from the 270 recorded runs
@@ -73,7 +73,7 @@ Tests:
 ```
 pnpm lint && pnpm typecheck
 pnpm test             # unit, component, and service tests (TypeScript and Python)
-pnpm test:e2e         # plays every mode in Microsoft Edge against a production build
+pnpm test:e2e         # plays both rooms in Microsoft Edge against a production build
 ```
 
 The Postgres store tests run only when `TEST_DATABASE_URL` points at a database (see `apps/web/src/server/store.pg.test.ts`).
@@ -94,7 +94,7 @@ The Postgres store tests run only when `TEST_DATABASE_URL` points at a database 
 - **One setting per model.** The models ran through Claude Code's agent loop, capped at 1,024 output tokens per call, with thinking off for Haiku and at the lowest effort for the other two. Results at other settings would differ.
 - **The public site only replays.** It cannot run a model, so the 270 letters are all there is.
 - **Small vote counts early.** The player ranking and the bias reports stay hidden until 30 votes, and even then their intervals are wide. Votes on a public site can be manipulated. One decision per browser per round, plus rate limits per address, is all that guards them.
-- **Not perfectly blind.** Writing style can hint at the author, and the recordings are in this repository. In "Does the Timetable Hold?", 30 of the 47 letters that fall short are explanation tasks, so the kind of task is itself a clue.
+- **Not perfectly blind.** Writing style can hint at the author, and the recordings are in this repository. In the Weekend's hold-or-fall rounds, 30 of the 47 letters that fall short are explanation tasks, so the kind of task is itself a clue.
 - **Diagram letters are drawn in the browser** with Mermaid, a 440 KB library. On a slow phone, drawing one blocks the page for a second or more when it scrolls into view.
 
 Inspired by golden-age detective fiction.

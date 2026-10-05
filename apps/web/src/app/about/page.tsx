@@ -6,6 +6,14 @@ export const metadata: Metadata = { title: "About · Poison Pen" };
 
 const SECTIONS: { title: string; points: string[] }[] = [
   {
+    title: "How to play",
+    points: [
+      "The Drawing Room is the main game. You are shown a task and two answers to it, each written by a different AI model, with the names hidden. Say which answer is better, call them equal, or trust neither. Then the models are named, with how each answer scored and what it cost.",
+      "A Weekend at Wrenfield is a ten-round challenge for points. Its rounds ask three things in turn: which model wrote a letter, whether two letters share one model, and whether a letter holds up. Three wrong answers end it.",
+      "In the game's words, an answer is a letter, a model is an author, and the guest beside a letter is only a costume.",
+    ],
+  },
+  {
     title: "What this is",
     points: [
       "A game laid over an evaluation of three AI models: Claude Haiku 4.5, Sonnet 5.5, and Opus 5.5. The setting is inspired by golden-age detective fiction.",
@@ -34,7 +42,7 @@ const SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "Points",
     points: [
-      "Points come only from answers that can be right or wrong: naming the author (100), calling the timetable (40), and accusing one author of holding two seats (50 if right, 30 lost if wrong).",
+      "Points come only from answers that can be right or wrong: naming the model that wrote a letter (100), calling whether a letter holds up (40), and accusing one model of writing both letters (50 if right, 30 lost if wrong).",
       "A preference earns no points, and nothing is ever awarded for agreeing with other players. After you decide you are told what share of players trusted the same letter, once at least five have voted. That is information, not a score.",
       "How sure you said you were is recorded and does not change your points. Your Casebook shows how often you were right at each level.",
     ],
@@ -42,15 +50,14 @@ const SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "Impostors",
     points: [
-      "About one Drawing Room round in eight, and some later rounds of a Weekend, show the same model in both seats: two of its three runs on the same task. Any preference between them is chance, taste for a costume, or a real difference between two runs of one model.",
+      "About one Drawing Room round in eight, and some later rounds of a Weekend, show the same model in both seats: two of its three runs on the same task. Any preference between them is chance, taste for a costume, or a real difference between two runs of one model. If you think that is what you are looking at, accuse.",
       "These rounds never count toward the Official Record's ranking.",
-      "In The Library Gathering all three authors are always present, so there is nothing to accuse and no button for it.",
     ],
   },
   {
-    title: "Does the timetable hold?",
+    title: "Does the letter hold up?",
     points: [
-      "You see one letter, and the scorer's verdict is withheld. For code and agent tasks, “it holds” means the answer passed hidden tests or matched the one right answer. For the other tasks it means the letter met every rule the task stated.",
+      "Some rounds of a Weekend show one letter and withhold the scorer's verdict. For code and agent tasks, “it holds” means the answer passed hidden tests or matched the one right answer. For the other tasks it means the letter met every rule the task stated.",
       "Far more letters hold than fall apart, so rounds are dealt by outcome: about half the time you are shown one that held and half the time one that did not. Guessing “it holds” every time is right only about half the time.",
     ],
   },
@@ -66,10 +73,17 @@ const SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "The Official Record",
     points: [
-      "Players: Elo with K=32, starting at 1000, replayed in order, with a 95% bootstrap interval. It uses only preferences from The Drawing Room and The Library Gathering. A ranking of three letters counts as three comparisons.",
+      "Players: Elo with K=32, starting at 1000, replayed in order, with a 95% bootstrap interval. It uses only preferences from The Drawing Room, together with the rankings made in The Library Gathering before that room closed. A ranking of three letters counts as three comparisons.",
       "Official benchmarks: Anthropic's published scores, copied from its announcement pages with the source and the date checked. Two models are compared only on benchmarks reported for both. Anthropic reports no benchmark that Haiku 4.5 shares with the two newer models, so Haiku has no official rank here.",
       "Our scorer: a pass counts 1, a fail 0, and an open-ended letter the share of its rules met, averaged over all three runs of the 30 tasks. Totals are shown with the lowest and highest run.",
       "The official benchmarks measure different tasks from ours, at higher effort settings. They are shown for comparison, not as a target.",
+    ],
+  },
+  {
+    title: "Rooms that have closed",
+    points: [
+      "Until 5 October 2026 the Hall had five rooms. The Library Gathering (rank three letters), Does the Timetable Hold? (one letter, hold or fall), and The Morning Post (five rounds a day) were closed so that a visitor meets one game, not five.",
+      "Every decision made in them is kept. Library rankings still count toward the players' ranking, and points earned there still count toward your rank.",
     ],
   },
   {

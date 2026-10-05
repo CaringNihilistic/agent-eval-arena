@@ -20,7 +20,7 @@ import {
   type BlindRound,
   type Confidence,
   type GameState,
-  type Mode,
+  type PlayableMode,
   type RevealedRound,
   type Seat,
 } from "@/lib/types";
@@ -34,7 +34,7 @@ function TaskCard({ round }: { round: BlindRound | RevealedRound }) {
   return (
     <Panel className="flex flex-col gap-2">
       <Label>
-        The matter at hand · {CATEGORY_LABELS[round.task.category]} · {round.task.title}
+        The task · {CATEGORY_LABELS[round.task.category]} · {round.task.title}
       </Label>
       {/* Shown as written: prompts carry code and lists whose line breaks and indentation matter. */}
       <p className="text-sm leading-relaxed whitespace-pre-wrap">{round.task.prompt.trim()}</p>
@@ -45,8 +45,8 @@ function TaskCard({ round }: { round: BlindRound | RevealedRound }) {
 function timetableQuestion(round: BlindRound): string {
   const openEnded = !["code", "agent"].includes(round.task.category);
   return openEnded
-    ? "Does the timetable hold? Does this letter meet every rule it was given?"
-    : "Does the timetable hold? Will this answer pass the hidden tests?";
+    ? "Does this letter hold up? It holds if it keeps every rule the task set."
+    : "Does this letter hold up? It holds if the answer passes the hidden tests.";
 }
 
 /** A round awaiting the player's decision. */
@@ -136,7 +136,7 @@ function Challenge({ seed }: { seed: string }) {
 }
 
 /** Shown when a mode has no round to deal: the game is over, or the room is exhausted. */
-function NothingToDeal({ mode, game }: { mode: Mode; game: GameState | null }) {
+function NothingToDeal({ mode, game }: { mode: PlayableMode; game: GameState | null }) {
   if (game?.type === "weekend") {
     return (
       <Panel className="flex flex-col gap-4">
@@ -160,30 +160,18 @@ function NothingToDeal({ mode, game }: { mode: Mode; game: GameState | null }) {
       </Panel>
     );
   }
-  if (game?.type === "morning_post") {
-    return (
-      <Panel className="flex flex-col gap-4">
-        <h2 className="deco-title text-2xl">You have read today&apos;s Morning Post.</h2>
-        <p className="font-mono text-lg" data-testid="share-text">
-          {game.share_text}
-        </p>
-        <CopyButton text={game.share_text ?? ""} label="Copy the result" />
-        <p className="text-sm text-muted-foreground">
-          A filled square is a round you did not get wrong. A new edition arrives at midnight, UTC.
-        </p>
-        <Button asChild variant="outline" className="self-start">
-          <Link href="/">Back to the Hall</Link>
-        </Button>
-      </Panel>
-    );
-  }
   return (
     <Panel className="flex flex-col gap-4">
       <h2 className="deco-title text-2xl">Nothing is left on the table.</h2>
       <p>You have judged everything {MODE_NAMES[mode]} has to offer.</p>
-      <Button asChild variant="outline" className="self-start">
-        <Link href="/">Back to the Hall</Link>
-      </Button>
+      <div className="flex flex-wrap gap-3">
+        <Button asChild>
+          <Link href="/record">See the results</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/">Back to the Hall</Link>
+        </Button>
+      </div>
     </Panel>
   );
 }
@@ -197,7 +185,7 @@ export function RoundTable({
   seed = null,
   onGameOver,
 }: {
-  mode: Mode;
+  mode: PlayableMode;
   /** A Weekend seed to resume or to take up as a challenge. */
   seed?: string | null;
   /** Called when a seeded game has no round left. */
@@ -275,7 +263,7 @@ export function RoundTable({
                 window.scrollTo({ top: 0 });
               }}
             >
-              {lastOfGame ? "See how it ended" : "The next letter"}
+              {lastOfGame ? "See how it ended" : "Next round"}
             </Button>
             <Button asChild variant="outline" size="lg">
               <Link href="/">Back to the Hall</Link>

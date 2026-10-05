@@ -1,14 +1,13 @@
 import Link from "next/link";
 
 const LINKS = [
-  { href: "/", label: "The Hall" },
-  { href: "/guests", label: "The Guest List" },
-  { href: "/record", label: "The Official Record" },
+  { href: "/drawing-room", label: "Play" },
+  { href: "/record", label: "Results" },
   { href: "/casebook", label: "My Casebook" },
   { href: "/about", label: "About" },
 ];
 
-// These links are on every page. They are not prefetched: fetching five other pages
+// These links are on every page. They are not prefetched: fetching every other page's
 // code on each load costs a phone more than the click saves.
 export function SiteHeader() {
   return (

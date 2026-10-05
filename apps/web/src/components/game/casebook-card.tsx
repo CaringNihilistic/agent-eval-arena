@@ -68,11 +68,11 @@ export function CasebookCard({ casebook }: { casebook: Casebook }) {
             (level) => `${CONFIDENCE_LABELS[level]}: ${tally(casebook.by_confidence[level])}`,
           ).join(" · ")}
         </Fact>
-        <Fact label="Morning Post">
-          {casebook.morning_post
-            ? `No. ${casebook.morning_post.game.slice(3)} ${casebook.morning_post.squares}`
-            : "not read yet"}
-        </Fact>
+        {casebook.morning_post ? (
+          <Fact label="Last Morning Post">
+            {`No. ${casebook.morning_post.game.slice(3)} ${casebook.morning_post.squares}`}
+          </Fact>
+        ) : null}
         <Fact label="Weekends survived">{casebook.weekends_survived}</Fact>
       </dl>
 
@@ -116,7 +116,7 @@ function NotYet({ casebook }: { casebook: Casebook }) {
         points and the rank of {casebook.rank}.
       </p>
       <Button asChild className="self-start">
-        <Link href="/weekend">Begin a weekend</Link>
+        <Link href="/drawing-room">Play a round</Link>
       </Button>
     </Parchment>
   );

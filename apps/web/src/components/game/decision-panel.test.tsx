@@ -41,7 +41,10 @@ describe("the verdict panel", () => {
     ]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
-    expect(ACCUSE_LABEL).toBe("Accuse: one author, two seats");
+    expect(ACCUSE_LABEL).toBe("Accuse: the same model wrote both");
+    expect(
+      screen.getByRole("heading", { name: "Which letter answers the task better?" }),
+    ).toBeInTheDocument();
   });
 
   it("asks how sure the player is, with three levels, in every kind of round", () => {
@@ -123,6 +126,9 @@ describe("the verdict panel", () => {
   it("offers the three authors, and no accusation, in a single-letter round", async () => {
     const { onSubmit, user } = setup("author", ["A"]);
 
+    expect(
+      screen.getByRole("heading", { name: "Which AI model wrote this letter?" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: ACCUSE_LABEL })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Sonnet 5.5" }));
     await user.click(screen.getByRole("button", { name: "A hunch" }));
